@@ -94,10 +94,11 @@ router.post('/login', async (req, res, next) => {
     }
 
     const session = await createSession(user);
+    const isProduction = process.env.NODE_ENV === 'production';
     res.cookie(SESSION_COOKIE_NAME, session.token, {
       httpOnly: true,
-      sameSite: 'lax',
-      secure: process.env.NODE_ENV === 'production',
+      sameSite: isProduction ? 'none' : 'lax',
+      secure: isProduction,
       maxAge: SESSION_TTL_MS,
       path: '/',
     });
