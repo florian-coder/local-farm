@@ -1,0 +1,597 @@
+{
+  "entries": [
+    {
+      "key": "pexels:farmers market:1",
+      "value": {
+        "query": "farmers market",
+        "photos": [
+          {
+            "id": 1635330,
+            "url": "https://www.pexels.com/photo/man-standing-beside-table-with-vegetables-near-buildings-1635330/",
+            "alt": "Man arranging fresh vegetables at an outdoor street market stall.",
+            "photographer": "Brett Sayles",
+            "src": {
+              "large": "https://images.pexels.com/photos/1635330/pexels-photo-1635330.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/1635330/pexels-photo-1635330.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/1635330/pexels-photo-1635330.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          }
+        ]
+      },
+      "expiresAt": "2026-01-21T20:24:28.463Z"
+    },
+    {
+      "key": "pexels:product:apples",
+      "value": {
+        "query": "apples",
+        "photos": []
+      },
+      "expiresAt": "2026-01-27T20:53:17.154Z"
+    },
+    {
+      "key": "pexels:product:pickles",
+      "value": {
+        "query": "pickles",
+        "photos": []
+      },
+      "expiresAt": "2026-01-27T20:53:17.170Z"
+    },
+    {
+      "key": "pexels:product:fresh vegetables",
+      "value": {
+        "query": "fresh vegetables",
+        "photos": []
+      },
+      "expiresAt": "2026-01-27T20:53:17.220Z"
+    },
+    {
+      "key": "pexels:rosii:1",
+      "value": {
+        "query": "rosii",
+        "photos": []
+      },
+      "expiresAt": "2026-01-21T21:06:47.265Z"
+    },
+    {
+      "key": "pexels:pineapple:1",
+      "value": {
+        "query": "pineapple",
+        "photos": []
+      },
+      "expiresAt": "2026-01-21T21:11:01.118Z"
+    },
+    {
+      "key": "pexels:carrot:1",
+      "value": {
+        "query": "carrot",
+        "photos": []
+      },
+      "expiresAt": "2026-01-21T21:11:01.132Z"
+    },
+    {
+      "key": "pexels:product:ro-RO:carrot",
+      "value": {
+        "query": "carrot",
+        "photos": [
+          {
+            "id": 14578637,
+            "url": "https://www.pexels.com/ro-ro/fotografie/raceala-gripa-rece-frig-14578637/",
+            "alt": "Imagine de stoc gratuită din alb, albastru, Alpi",
+            "photographer": "Clément Proust",
+            "photographer_url": "https://www.pexels.com/ro-ro/@clement-proust-363898785",
+            "src": {
+              "large": "https://images.pexels.com/photos/14578637/pexels-photo-14578637.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/14578637/pexels-photo-14578637.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/14578637/pexels-photo-14578637.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          }
+        ]
+      },
+      "expiresAt": "2026-01-27T21:27:46.241Z"
+    },
+    {
+      "key": "pexels:product:ro-RO:cucumber",
+      "value": {
+        "query": "cucumber",
+        "photos": [
+          {
+            "id": 2329440,
+            "url": "https://www.pexels.com/ro-ro/fotografie/mancare-produse-alimentare-sanatos-verde-2329440/",
+            "alt": "Imagine de stoc gratuită din activități agricole, agricultură, alimente crude",
+            "photographer": "Lo",
+            "photographer_url": "https://www.pexels.com/ro-ro/@lo-422811",
+            "src": {
+              "large": "https://images.pexels.com/photos/2329440/pexels-photo-2329440.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/2329440/pexels-photo-2329440.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/2329440/pexels-photo-2329440.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          }
+        ]
+      },
+      "expiresAt": "2026-01-27T21:32:33.718Z"
+    },
+    {
+      "key": "pexels:product:ro-RO:spinach",
+      "value": {
+        "query": "spinach",
+        "photos": [
+          {
+            "id": 6631954,
+            "url": "https://www.pexels.com/ro-ro/fotografie/mancare-produse-alimentare-fotografie-alimentara-produse-de-patiserie-6631954/",
+            "alt": "Imagine de stoc gratuită din a închide, alimentație, aperitiv",
+            "photographer": "Alesia  Kozik",
+            "photographer_url": "https://www.pexels.com/ro-ro/@alesiakozik",
+            "src": {
+              "large": "https://images.pexels.com/photos/6631954/pexels-photo-6631954.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/6631954/pexels-photo-6631954.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/6631954/pexels-photo-6631954.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          }
+        ]
+      },
+      "expiresAt": "2026-01-27T21:32:58.114Z"
+    },
+    {
+      "key": "pexels:product:ro-RO:tomato",
+      "value": {
+        "query": "tomato",
+        "photos": [
+          {
+            "id": 162744,
+            "url": "https://www.pexels.com/ro-ro/fotografie/mancare-produse-alimentare-pizza-restaurant-162744/",
+            "alt": "Imagine de stoc gratuită din apetisant, ardei roșu, blat",
+            "photographer": "Pixabay",
+            "photographer_url": "https://www.pexels.com/ro-ro/@pixabay",
+            "src": {
+              "large": "https://images.pexels.com/photos/162744/tomatoes-tomato-quiche-red-yellow-162744.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/162744/tomatoes-tomato-quiche-red-yellow-162744.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/162744/tomatoes-tomato-quiche-red-yellow-162744.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          }
+        ]
+      },
+      "expiresAt": "2026-01-27T21:33:15.248Z"
+    },
+    {
+      "key": "pexels:product:ro-RO:onion",
+      "value": {
+        "query": "onion",
+        "photos": [
+          {
+            "id": 29560963,
+            "url": "https://www.pexels.com/ro-ro/fotografie/expozi-ie-abundenta-de-ceapa-ro-ie-proaspata-in-brazilia-29560963/",
+            "alt": "O fotografie vibrantă care prezintă o grămadă de ceapă roșie proaspătă la o piață din Brazilia.",
+            "photographer": "Mateus Belarmino",
+            "photographer_url": "https://www.pexels.com/ro-ro/@mateus-belarmino-1944648540",
+            "src": {
+              "large": "https://images.pexels.com/photos/29560963/pexels-photo-29560963.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/29560963/pexels-photo-29560963.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/29560963/pexels-photo-29560963.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          }
+        ]
+      },
+      "expiresAt": "2026-01-27T21:33:38.192Z"
+    },
+    {
+      "key": "pexels:product:ro-RO:rosii",
+      "value": {
+        "query": "rosii",
+        "photos": [
+          {
+            "id": 34367608,
+            "url": "https://www.pexels.com/ro-ro/fotografie/protest-in-sacramento-cu-afi-aj-emblematic-34367608/",
+            "alt": "O mulțime s-a adunat la un protest în Sacramento, având un panou umoristic și emblematic.",
+            "photographer": "Stephen Leonardi",
+            "photographer_url": "https://www.pexels.com/ro-ro/@stephen-leonardi-587681991",
+            "src": {
+              "large": "https://images.pexels.com/photos/34367608/pexels-photo-34367608.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/34367608/pexels-photo-34367608.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/34367608/pexels-photo-34367608.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 11218490,
+            "url": "https://www.pexels.com/ro-ro/fotografie/petale-floare-trandafir-inflorire-11218490/",
+            "alt": "Imagine de stoc gratuită din a închide, botanic, care înmugurește",
+            "photographer": "Soubhagya Maharana",
+            "photographer_url": "https://www.pexels.com/ro-ro/@soubhagya23",
+            "src": {
+              "large": "https://images.pexels.com/photos/11218490/pexels-photo-11218490.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/11218490/pexels-photo-11218490.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/11218490/pexels-photo-11218490.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 54323,
+            "url": "https://www.pexels.com/ro-ro/fotografie/dragoste-iubire-romantic-flori-54323/",
+            "alt": "Imagine de stoc gratuită din a închide, arc, botanic",
+            "photographer": "Pixabay",
+            "photographer_url": "https://www.pexels.com/ro-ro/@pixabay",
+            "src": {
+              "large": "https://images.pexels.com/photos/54323/rose-composites-flowers-spring-54323.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/54323/rose-composites-flowers-spring-54323.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/54323/rose-composites-flowers-spring-54323.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 10081421,
+            "url": "https://www.pexels.com/ro-ro/fotografie/prim-plan-pe-flori-albe-10081421/",
+            "alt": "Prim Plan Pe Flori Albe",
+            "photographer": "Yaroslava Borz",
+            "photographer_url": "https://www.pexels.com/ro-ro/@yaroslava-borz-126286496",
+            "src": {
+              "large": "https://images.pexels.com/photos/10081421/pexels-photo-10081421.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/10081421/pexels-photo-10081421.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/10081421/pexels-photo-10081421.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 7991579,
+            "url": "https://www.pexels.com/ro-ro/fotografie/muzica-camera-incapere-spectacol-7991579/",
+            "alt": "Imagine de stoc gratuită din #de interior, afișaj animat, afișaj de desene animate",
+            "photographer": "Tima Miroshnichenko",
+            "photographer_url": "https://www.pexels.com/ro-ro/@tima-miroshnichenko",
+            "src": {
+              "large": "https://images.pexels.com/photos/7991579/pexels-photo-7991579.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/7991579/pexels-photo-7991579.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/7991579/pexels-photo-7991579.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 752892,
+            "url": "https://www.pexels.com/ro-ro/fotografie/752892/",
+            "alt": "Imagine de stoc gratuită din a închide, botanic, culori vibrante",
+            "photographer": "Khaled Reese",
+            "photographer_url": "https://www.pexels.com/ro-ro/@khaledreese",
+            "src": {
+              "large": "https://images.pexels.com/photos/752892/pexels-photo-752892.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/752892/pexels-photo-752892.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/752892/pexels-photo-752892.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 7086836,
+            "url": "https://www.pexels.com/ro-ro/fotografie/textura-perete-zid-suprafa-a-7086836/",
+            "alt": "Imagine de stoc gratuită din a închide, abraziv, arhitectură",
+            "photographer": "Tom Fisk",
+            "photographer_url": "https://www.pexels.com/ro-ro/@tomfisk",
+            "src": {
+              "large": "https://images.pexels.com/photos/7086836/pexels-photo-7086836.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/7086836/pexels-photo-7086836.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/7086836/pexels-photo-7086836.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 3607650,
+            "url": "https://www.pexels.com/ro-ro/fotografie/lumina-u-or-ro-u-strada-3607650/",
+            "alt": "Imagine de stoc gratuită din arhitectură, arhitectura contemporana, aspect",
+            "photographer": "Ana Maria",
+            "photographer_url": "https://www.pexels.com/ro-ro/@annamaria123",
+            "src": {
+              "large": "https://images.pexels.com/photos/3607650/pexels-photo-3607650.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/3607650/pexels-photo-3607650.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/3607650/pexels-photo-3607650.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          }
+        ]
+      },
+      "expiresAt": "2026-01-27T21:37:22.413Z"
+    },
+    {
+      "key": "pexels:product:ro-RO:cartofi",
+      "value": {
+        "query": "cartofi",
+        "photos": [
+          {
+            "id": 1583884,
+            "url": "https://www.pexels.com/ro-ro/fotografie/1583884/",
+            "alt": "Imagine de stoc gratuită din aperitiv, atrăgător, auriu",
+            "photographer": "Dzenina Lukac",
+            "photographer_url": "https://www.pexels.com/ro-ro/@dzeninalukac",
+            "src": {
+              "large": "https://images.pexels.com/photos/1583884/pexels-photo-1583884.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/1583884/pexels-photo-1583884.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/1583884/pexels-photo-1583884.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 2286776,
+            "url": "https://www.pexels.com/ro-ro/fotografie/2286776/",
+            "alt": "Imagine de stoc gratuită din a închide, abundent, activități agricole",
+            "photographer": "Marco Antonio Victorino",
+            "photographer_url": "https://www.pexels.com/ro-ro/@victorino",
+            "src": {
+              "large": "https://images.pexels.com/photos/2286776/pexels-photo-2286776.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/2286776/pexels-photo-2286776.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/2286776/pexels-photo-2286776.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 2966196,
+            "url": "https://www.pexels.com/ro-ro/fotografie/mancare-produse-alimentare-farfurie-pranz-2966196/",
+            "alt": "Imagine de stoc gratuită din aperitiv, auriu, cartilaj",
+            "photographer": "Suzy Hazelwood",
+            "photographer_url": "https://www.pexels.com/ro-ro/@suzyhazelwood",
+            "src": {
+              "large": "https://images.pexels.com/photos/2966196/pexels-photo-2966196.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/2966196/pexels-photo-2966196.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/2966196/pexels-photo-2966196.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 750073,
+            "url": "https://www.pexels.com/ro-ro/fotografie/paine-mancare-produse-alimentare-sandvi-750073/",
+            "alt": "Imagine de stoc gratuită din a închide, aluat de cozonac, apă carbogazoasă",
+            "photographer": "Daniela Elena Tentis",
+            "photographer_url": "https://www.pexels.com/ro-ro/@daniela-elena-tentis-118658",
+            "src": {
+              "large": "https://images.pexels.com/photos/750073/pexels-photo-750073.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/750073/pexels-photo-750073.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/750073/pexels-photo-750073.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 4110464,
+            "url": "https://www.pexels.com/ro-ro/fotografie/cartofi-gatit-ingrediente-tava-4110464/",
+            "alt": "Imagine de stoc gratuită din a închide, alimentație, alimente proaspete",
+            "photographer": "Polina Tankilevitch",
+            "photographer_url": "https://www.pexels.com/ro-ro/@polina-tankilevitch",
+            "src": {
+              "large": "https://images.pexels.com/photos/4110464/pexels-photo-4110464.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/4110464/pexels-photo-4110464.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/4110464/pexels-photo-4110464.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 2446908,
+            "url": "https://www.pexels.com/ro-ro/fotografie/mancare-produse-alimentare-restaurant-cina-2446908/",
+            "alt": "Imagine de stoc gratuită din adunare socială, alternativă la sifon, America de Nord",
+            "photographer": "Anna Lowe",
+            "photographer_url": "https://www.pexels.com/ro-ro/@anna-lowe-895508",
+            "src": {
+              "large": "https://images.pexels.com/photos/2446908/pexels-photo-2446908.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/2446908/pexels-photo-2446908.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/2446908/pexels-photo-2446908.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 9444056,
+            "url": "https://www.pexels.com/ro-ro/fotografie/mancare-produse-alimentare-cartofi-gustare-9444056/",
+            "alt": "Imagine de stoc gratuită din a închide, aperitiv, apetisant",
+            "photographer": "KAJU style",
+            "photographer_url": "https://www.pexels.com/ro-ro/@kaju-style-102944731",
+            "src": {
+              "large": "https://images.pexels.com/photos/9444056/pexels-photo-9444056.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/9444056/pexels-photo-9444056.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/9444056/pexels-photo-9444056.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 2729710,
+            "url": "https://www.pexels.com/ro-ro/fotografie/mancare-produse-alimentare-masa-por-ie-2729710/",
+            "alt": "Imagine de stoc gratuită din a închide, alimente nesănătoase, America de Nord",
+            "photographer": "Alex Hussein",
+            "photographer_url": "https://www.pexels.com/ro-ro/@alex-hussein-1391461",
+            "src": {
+              "large": "https://images.pexels.com/photos/2729710/pexels-photo-2729710.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/2729710/pexels-photo-2729710.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/2729710/pexels-photo-2729710.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          }
+        ]
+      },
+      "expiresAt": "2026-01-27T21:37:22.645Z"
+    },
+    {
+      "key": "pexels:product:ro-RO:mere",
+      "value": {
+        "query": "mere",
+        "photos": [
+          {
+            "id": 9780428,
+            "url": "https://www.pexels.com/ro-ro/fotografie/mancare-produse-alimentare-fructe-mere-9780428/",
+            "alt": "Imagine de stoc gratuită din bețe de scorțișoară, casă la fermă, castron de mere",
+            "photographer": "Юлия Чалова",
+            "photographer_url": "https://www.pexels.com/ro-ro/@julia-chalova",
+            "src": {
+              "large": "https://images.pexels.com/photos/9780428/pexels-photo-9780428.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/9780428/pexels-photo-9780428.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/9780428/pexels-photo-9780428.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 3903599,
+            "url": "https://www.pexels.com/ro-ro/fotografie/mancare-produse-alimentare-sanatos-ro-u-3903599/",
+            "alt": "Imagine de stoc gratuită din a închide, abundenta de fructe, băcănie",
+            "photographer": "Dmitry Demidov",
+            "photographer_url": "https://www.pexels.com/ro-ro/@dmitry-demidov-515774",
+            "src": {
+              "large": "https://images.pexels.com/photos/3903599/pexels-photo-3903599.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/3903599/pexels-photo-3903599.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/3903599/pexels-photo-3903599.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 1870725,
+            "url": "https://www.pexels.com/ro-ro/fotografie/1870725/",
+            "alt": "Imagine de stoc gratuită din afișarea fructelor, alegere sănătoasă, alimentație",
+            "photographer": "Lisa from Pexels",
+            "photographer_url": "https://www.pexels.com/ro-ro/@fotios-photos",
+            "src": {
+              "large": "https://images.pexels.com/photos/1870725/pexels-photo-1870725.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/1870725/pexels-photo-1870725.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/1870725/pexels-photo-1870725.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 209339,
+            "url": "https://www.pexels.com/ro-ro/fotografie/mancare-produse-alimentare-sanatos-apple-209339/",
+            "alt": "Imagine de stoc gratuită din @în aer liber, a închide, adâncime de câmp",
+            "photographer": "Pixabay",
+            "photographer_url": "https://www.pexels.com/ro-ro/@pixabay",
+            "src": {
+              "large": "https://images.pexels.com/photos/209339/pexels-photo-209339.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/209339/pexels-photo-209339.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/209339/pexels-photo-209339.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 1656670,
+            "url": "https://www.pexels.com/ro-ro/fotografie/1656670/",
+            "alt": "Imagine de stoc gratuită din afișarea fructelor, afișarea pieței, alimente naturale",
+            "photographer": "Wendy Wei",
+            "photographer_url": "https://www.pexels.com/ro-ro/@wendywei",
+            "src": {
+              "large": "https://images.pexels.com/photos/1656670/pexels-photo-1656670.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/1656670/pexels-photo-1656670.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/1656670/pexels-photo-1656670.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 8914340,
+            "url": "https://www.pexels.com/ro-ro/fotografie/mancare-produse-alimentare-sanatos-fructe-8914340/",
+            "alt": "Imagine de stoc gratuită din a închide, afișarea fructelor, alimente crude",
+            "photographer": "Elizabeth Makes Photos",
+            "photographer_url": "https://www.pexels.com/ro-ro/@elizabeth-makes-photos-43381721",
+            "src": {
+              "large": "https://images.pexels.com/photos/8914340/pexels-photo-8914340.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/8914340/pexels-photo-8914340.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/8914340/pexels-photo-8914340.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 34380852,
+            "url": "https://www.pexels.com/ro-ro/fotografie/mere-ro-ii-proaspete-intr-un-co-in-aer-liber-34380852/",
+            "alt": "O mână ținând un coș de răchită umplut cu mere roșii pe iarbă verde.",
+            "photographer": "Griselda Belba",
+            "photographer_url": "https://www.pexels.com/ro-ro/@griselda-belba-173739063",
+            "src": {
+              "large": "https://images.pexels.com/photos/34380852/pexels-photo-34380852.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/34380852/pexels-photo-34380852.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/34380852/pexels-photo-34380852.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 18510514,
+            "url": "https://www.pexels.com/ro-ro/fotografie/mancare-produse-alimentare-sanatos-natura-18510514/",
+            "alt": "Imagine de stoc gratuită din abundență, activități agricole, afișarea abundenței de mere",
+            "photographer": "Markus Winkler",
+            "photographer_url": "https://www.pexels.com/ro-ro/@markus-winkler-1430818",
+            "src": {
+              "large": "https://images.pexels.com/photos/18510514/pexels-photo-18510514.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/18510514/pexels-photo-18510514.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/18510514/pexels-photo-18510514.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          }
+        ]
+      },
+      "expiresAt": "2026-01-27T21:37:22.663Z"
+    },
+    {
+      "key": "pexels:product:ro-RO:pineapple",
+      "value": {
+        "query": "pineapple",
+        "photos": [
+          {
+            "id": 139248,
+            "url": "https://www.pexels.com/ro-ro/fotografie/139248/",
+            "alt": "Imagine de stoc gratuită din afiș, ananas, artă",
+            "photographer": "Pineapple Supply Co.",
+            "photographer_url": "https://www.pexels.com/ro-ro/@psco",
+            "src": {
+              "large": "https://images.pexels.com/photos/139248/pexels-photo-139248.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/139248/pexels-photo-139248.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/139248/pexels-photo-139248.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 1501299,
+            "url": "https://www.pexels.com/ro-ro/fotografie/arta-colorat-in-culori-design-1501299/",
+            "alt": "Imagine de stoc gratuită din a închide, afișare creativă, ananas",
+            "photographer": "Pineapple Supply Co.",
+            "photographer_url": "https://www.pexels.com/ro-ro/@psco",
+            "src": {
+              "large": "https://images.pexels.com/photos/1501299/pexels-photo-1501299.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/1501299/pexels-photo-1501299.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/1501299/pexels-photo-1501299.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 189267,
+            "url": "https://www.pexels.com/ro-ro/fotografie/189267/",
+            "alt": "Imagine de stoc gratuită din ananas coapte, ananas coroana, ananas suculent",
+            "photographer": "Pineapple Supply Co.",
+            "photographer_url": "https://www.pexels.com/ro-ro/@psco",
+            "src": {
+              "large": "https://images.pexels.com/photos/189267/pexels-photo-189267.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/189267/pexels-photo-189267.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/189267/pexels-photo-189267.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 1674574,
+            "url": "https://www.pexels.com/ro-ro/fotografie/1674574/",
+            "alt": "Imagine de stoc gratuită din a închide, ananas, ananas pe galben",
+            "photographer": "PicFoods.com",
+            "photographer_url": "https://www.pexels.com/ro-ro/@picfoods-com-804644",
+            "src": {
+              "large": "https://images.pexels.com/photos/1674574/pexels-photo-1674574.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/1674574/pexels-photo-1674574.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/1674574/pexels-photo-1674574.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 189349,
+            "url": "https://www.pexels.com/ro-ro/fotografie/189349/",
+            "alt": "Imagine de stoc gratuită din 4k fundal, apă, apus",
+            "photographer": "Sebastian Voortman",
+            "photographer_url": "https://www.pexels.com/ro-ro/@sebastian",
+            "src": {
+              "large": "https://images.pexels.com/photos/189349/pexels-photo-189349.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/189349/pexels-photo-189349.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/189349/pexels-photo-189349.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 174672,
+            "url": "https://www.pexels.com/ro-ro/fotografie/174672/",
+            "alt": "Imagine de stoc gratuită din a închide, ananas, ananas top",
+            "photographer": "Pineapple Supply Co.",
+            "photographer_url": "https://www.pexels.com/ro-ro/@psco",
+            "src": {
+              "large": "https://images.pexels.com/photos/174672/pexels-photo-174672.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/174672/pexels-photo-174672.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/174672/pexels-photo-174672.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 1216349,
+            "url": "https://www.pexels.com/ro-ro/fotografie/fotografie-de-prim-plan-cu-fructe-de-ananas-1216349/",
+            "alt": "Fotografie De Prim Plan Cu Fructe De Ananas",
+            "photographer": "Madison Inouye",
+            "photographer_url": "https://www.pexels.com/ro-ro/@mdsnmdsnmdsn",
+            "src": {
+              "large": "https://images.pexels.com/photos/1216349/pexels-photo-1216349.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/1216349/pexels-photo-1216349.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/1216349/pexels-photo-1216349.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          },
+          {
+            "id": 1343465,
+            "url": "https://www.pexels.com/ro-ro/fotografie/1343465/",
+            "alt": "Imagine de stoc gratuită din ananas, aroma, arta culinara",
+            "photographer": "Alisha Mishra",
+            "photographer_url": "https://www.pexels.com/ro-ro/@alisha-mishra-579430",
+            "src": {
+              "large": "https://images.pexels.com/photos/1343465/pexels-photo-1343465.jpeg?auto=compress&cs=tinysrgb&h=650&w=940",
+              "medium": "https://images.pexels.com/photos/1343465/pexels-photo-1343465.jpeg?auto=compress&cs=tinysrgb&h=350",
+              "landscape": "https://images.pexels.com/photos/1343465/pexels-photo-1343465.jpeg?auto=compress&cs=tinysrgb&fit=crop&h=627&w=1200"
+            }
+          }
+        ]
+      },
+      "expiresAt": "2026-01-27T21:40:36.088Z"
+    }
+  ]
+}

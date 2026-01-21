@@ -1,0 +1,72 @@
+{
+  "products": [
+    {
+      "id": "27725b73-1926-4b20-80bd-ac028dd0ca8b",
+      "vendorId": "6482a3a4-f67c-432e-bc38-bdd061147b16",
+      "name": "cucumber",
+      "category": "vegetable",
+      "unit": "kg",
+      "rating": 4,
+      "available": true,
+      "image": {
+        "url": "https://images.pexels.com/photos/2329440/pexels-photo-2329440.jpeg?auto=compress&cs=tinysrgb&h=350",
+        "alt": "Imagine de stoc gratuită din activități agricole, agricultură, alimente crude",
+        "photographer": "Lo",
+        "photographerUrl": "https://www.pexels.com/ro-ro/@lo-422811",
+        "photoUrl": "https://www.pexels.com/ro-ro/fotografie/mancare-produse-alimentare-sanatos-verde-2329440/"
+      },
+      "createdAt": "2026-01-20T21:32:33.720Z"
+    },
+    {
+      "id": "3497dad7-d64e-4010-9afa-c3229321a4e0",
+      "vendorId": "6482a3a4-f67c-432e-bc38-bdd061147b16",
+      "name": "spinach",
+      "category": "vegetable",
+      "unit": "kg",
+      "rating": 4,
+      "available": true,
+      "image": {
+        "url": "https://images.pexels.com/photos/6631954/pexels-photo-6631954.jpeg?auto=compress&cs=tinysrgb&h=350",
+        "alt": "Imagine de stoc gratuită din a închide, alimentație, aperitiv",
+        "photographer": "Alesia  Kozik",
+        "photographerUrl": "https://www.pexels.com/ro-ro/@alesiakozik",
+        "photoUrl": "https://www.pexels.com/ro-ro/fotografie/mancare-produse-alimentare-fotografie-alimentara-produse-de-patiserie-6631954/"
+      },
+      "createdAt": "2026-01-20T21:32:58.115Z"
+    },
+    {
+      "id": "68ee0ae0-3fe8-429c-ac1f-318be360ddda",
+      "vendorId": "6482a3a4-f67c-432e-bc38-bdd061147b16",
+      "name": "onion",
+      "category": "vegetable",
+      "unit": "kg",
+      "rating": 4,
+      "available": true,
+      "image": {
+        "url": "https://images.pexels.com/photos/29560963/pexels-photo-29560963.jpeg?auto=compress&cs=tinysrgb&h=350",
+        "alt": "O fotografie vibrantă care prezintă o grămadă de ceapă roșie proaspătă la o piață din Brazilia.",
+        "photographer": "Mateus Belarmino",
+        "photographerUrl": "https://www.pexels.com/ro-ro/@mateus-belarmino-1944648540",
+        "photoUrl": "https://www.pexels.com/ro-ro/fotografie/expozi-ie-abundenta-de-ceapa-ro-ie-proaspata-in-brazilia-29560963/"
+      },
+      "createdAt": "2026-01-20T21:33:38.194Z"
+    },
+    {
+      "id": "ec87973c-9e2d-419e-b7b6-4bac0db6a739",
+      "vendorId": "6482a3a4-f67c-432e-bc38-bdd061147b16",
+      "name": "pineapple",
+      "category": "vegetable",
+      "unit": "kg",
+      "rating": 4,
+      "available": true,
+      "image": {
+        "url": "https://images.pexels.com/photos/139248/pexels-photo-139248.jpeg?auto=compress&cs=tinysrgb&h=350",
+        "alt": "Imagine de stoc gratuită din afiș, ananas, artă",
+        "photographer": "Pineapple Supply Co.",
+        "photographerUrl": "https://www.pexels.com/ro-ro/@psco",
+        "photoUrl": "https://www.pexels.com/ro-ro/fotografie/139248/"
+      },
+      "createdAt": "2026-01-20T21:41:32.576Z"
+    }
+  ]
+}

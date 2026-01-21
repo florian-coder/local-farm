@@ -1,0 +1,28 @@
+{
+  "sessions": [
+    {
+      "id": "28a367b0-8bdc-41bd-b863-9662cd8a2b7f",
+      "token": "d1af9cb804ec2ce81b7f7da2c57fb5f3aa363b229286a4fb5f14c53489f30da6",
+      "userId": "c1508e5c-880e-4733-b349-bb8c87895bab",
+      "role": "vendor",
+      "createdAt": "2026-01-20T20:06:12.417Z",
+      "expiresAt": "2026-01-27T20:06:12.417Z"
+    },
+    {
+      "id": "8f52cef7-f271-4e9a-83d6-22aa5b4586da",
+      "token": "6cd2529a7cbd645993d2c8e25d0ef8c3be4c541fa6da2325ca0efdeb6420c638",
+      "userId": "c1508e5c-880e-4733-b349-bb8c87895bab",
+      "role": "vendor",
+      "createdAt": "2026-01-20T20:07:11.101Z",
+      "expiresAt": "2026-01-27T20:07:11.101Z"
+    },
+    {
+      "id": "2fd908d4-13dd-406d-906d-54f9aeb5345e",
+      "token": "7f9a9bf60a2389e15f4a08736cb35789f9928084d2bb48e031345f916661a232",
+      "userId": "c1508e5c-880e-4733-b349-bb8c87895bab",
+      "role": "vendor",
+      "createdAt": "2026-01-20T21:40:24.338Z",
+      "expiresAt": "2026-01-27T21:40:24.338Z"
+    }
+  ]
+}

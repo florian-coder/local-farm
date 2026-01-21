@@ -1,0 +1,46 @@
+{
+  "entries": [
+    {
+      "key": "commodity:tomatoes",
+      "value": {
+        "commodity": "tomatoes",
+        "priceRange": {
+          "min": 2.67,
+          "max": 4.8,
+          "unit": "USD/lb"
+        },
+        "headline": "Seasonal supply tightening",
+        "updatedAt": "2026-01-20T20:05:01.448Z"
+      },
+      "expiresAt": "2026-01-21T02:05:01.465Z"
+    },
+    {
+      "key": "commodity:potatoes",
+      "value": {
+        "commodity": "potatoes",
+        "priceRange": {
+          "min": 2.67,
+          "max": 4.8,
+          "unit": "USD/lb"
+        },
+        "headline": "Seasonal supply tightening",
+        "updatedAt": "2026-01-20T20:05:01.461Z"
+      },
+      "expiresAt": "2026-01-21T02:05:01.476Z"
+    },
+    {
+      "key": "commodity:apples",
+      "value": {
+        "commodity": "apples",
+        "priceRange": {
+          "min": 2,
+          "max": 3.6,
+          "unit": "USD/lb"
+        },
+        "headline": "Seasonal supply tightening",
+        "updatedAt": "2026-01-20T20:05:01.464Z"
+      },
+      "expiresAt": "2026-01-21T02:05:01.486Z"
+    }
+  ]
+}

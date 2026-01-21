@@ -1,0 +1,15 @@
+{
+  "vendors": [
+    {
+      "id": "6482a3a4-f67c-432e-bc38-bdd061147b16",
+      "userId": "c1508e5c-880e-4733-b349-bb8c87895bab",
+      "farmName": "ferma mea ",
+      "displayName": "top",
+      "lat": 0.5,
+      "lng": 20,
+      "bio": "safa",
+      "createdAt": "2026-01-20T20:07:54.276Z",
+      "updatedAt": "2026-01-20T20:45:25.329Z"
+    }
+  ]
+}

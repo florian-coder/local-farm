@@ -1,0 +1,22 @@
+{
+  "entries": [
+    {
+      "key": "item:Tomatoes|country:Romania",
+      "value": {
+        "item": "Tomatoes",
+        "country": "Romania",
+        "series": [
+          {
+            "year": 2020,
+            "value": 120
+          },
+          {
+            "year": 2021,
+            "value": 115
+          }
+        ]
+      },
+      "expiresAt": "2026-02-19T20:05:09.540Z"
+    }
+  ]
+}

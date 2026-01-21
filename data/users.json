@@ -1,0 +1,18 @@
+{
+  "users": [
+    {
+      "id": "c1508e5c-880e-4733-b349-bb8c87895bab",
+      "username": "florian",
+      "passwordHash": "3dabe774c0a405dd07d1f6c14347d646:f1e78859fd8719e53953a2d563a49010dee88e73b03922d25c09f5c1f1cfb04d29cfe60d86fe96a723238a4ab5d0d9935470f99c21c46749d9612dee72ed1929",
+      "role": "vendor",
+      "createdAt": "2026-01-20T20:06:03.209Z"
+    },
+    {
+      "id": "0531c325-af20-4061-9124-d40efdc6f908",
+      "username": "noemi",
+      "passwordHash": "42dd309a8a038569b75f0874e4c9e229:a9366a3d697eccae2fee6c04e9a45b7e90ce2988009ecb2a83296a778272a13ed9e2d26f36d29687a77ad648ff1efa06acfa0e163b57fc34d28729666ffe3a59",
+      "role": "customer",
+      "createdAt": "2026-01-20T21:36:14.507Z"
+    }
+  ]
+}

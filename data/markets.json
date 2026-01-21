@@ -1,0 +1,13 @@
+{
+  "markets": [
+    {
+      "id": "m1",
+      "name": "Central Market",
+      "lat": 44.4268,
+      "lng": 26.1025,
+      "pickupPoints": 3,
+      "openStands": 12,
+      "activeGrowers": 48
+    }
+  ]
+}

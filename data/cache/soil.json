@@ -1,0 +1,18 @@
+{
+  "entries": [
+    {
+      "key": "soil:44.4268,26.1025",
+      "value": {
+        "lat": 44.4268,
+        "lng": 26.1025,
+        "ph": null,
+        "organicCarbon": null,
+        "clay": null,
+        "sand": null,
+        "bulkDensity": null,
+        "qualityScore": 50
+      },
+      "expiresAt": "2026-01-27T20:05:11.194Z"
+    }
+  ]
+}
