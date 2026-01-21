@@ -12,6 +12,7 @@ const router = express.Router();
 
 const TOP_COMMODITIES = ['tomatoes', 'potatoes', 'apples'];
 const MAX_PRODUCT_DISTANCE_KM = 60;
+const MARKET_PRODUCTS_LIMIT = 6;
 const NEWS_IMAGE_QUERY = {
   tomatoes: 'tomatoes',
   potatoes: 'potatoes',
@@ -19,6 +20,14 @@ const NEWS_IMAGE_QUERY = {
 };
 
 const isNumber = (value) => typeof value === 'number' && Number.isFinite(value);
+
+const toTimestamp = (value) => {
+  const time = Date.parse(value);
+  return Number.isFinite(time) ? time : 0;
+};
+
+const sortByNewest = (items) =>
+  [...items].sort((a, b) => toTimestamp(b.createdAt) - toTimestamp(a.createdAt));
 
 const toRadians = (value) => (value * Math.PI) / 180;
 
@@ -58,6 +67,7 @@ router.get('/', async (req, res, next) => {
         available: product.available,
         rating: product.rating ?? null,
         image: product.image ?? null,
+        createdAt: product.createdAt ?? null,
         vendor: vendor
           ? {
               id: vendor.id,
@@ -169,8 +179,10 @@ router.get('/', async (req, res, next) => {
             MAX_PRODUCT_DISTANCE_KM
           );
         });
+        const sortedLocationProducts = sortByNewest(locationProducts);
+        const sortedProducts = sortByNewest(hydratedProducts);
         const marketProducts =
-          locationProducts.length > 0 ? locationProducts : hydratedProducts;
+          sortedLocationProducts.length > 0 ? sortedLocationProducts : sortedProducts;
 
         return {
           id: market.id,
@@ -187,7 +199,7 @@ router.get('/', async (req, res, next) => {
             : null,
           marketNews: marketNewsWithImages.filter(Boolean).slice(0, 3),
           globalStats,
-          products: marketProducts.slice(0, 6),
+          products: marketProducts.slice(0, MARKET_PRODUCTS_LIMIT),
         };
       }),
     );

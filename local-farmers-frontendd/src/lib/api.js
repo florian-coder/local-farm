@@ -4,22 +4,52 @@ export const getApiBase = () => {
 };
 
 export const apiFetch = (path, options = {}) => {
+  const { timeoutMs = 12000, signal: externalSignal, ...restOptions } = options;
   const base = getApiBase();
   const url = path.startsWith('http')
     ? path
     : `${base}${path.startsWith('/') ? '' : '/'}${path}`;
+  const controller = new AbortController();
+  let timeoutId;
+  let abortHandler;
+
+  if (externalSignal) {
+    if (externalSignal.aborted) {
+      controller.abort();
+    } else {
+      abortHandler = () => controller.abort();
+      externalSignal.addEventListener('abort', abortHandler);
+    }
+  }
+
+  if (Number.isFinite(timeoutMs) && timeoutMs > 0) {
+    timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  }
+
   const fetchOptions = {
     credentials: 'include',
-    ...options,
+    ...restOptions,
     headers: {
       'Content-Type': 'application/json',
-      ...(options.headers || {}),
+      ...(restOptions.headers || {}),
     },
+    signal: controller.signal,
   };
 
-  if (options.body === undefined && fetchOptions.method === 'GET') {
+  const method = (fetchOptions.method || 'GET').toUpperCase();
+  if (restOptions.body === undefined && method === 'GET') {
     delete fetchOptions.body;
   }
 
-  return fetch(url, fetchOptions);
+  const fetchPromise = fetch(url, fetchOptions);
+  fetchPromise.finally(() => {
+    if (timeoutId) {
+      clearTimeout(timeoutId);
+    }
+    if (externalSignal && abortHandler) {
+      externalSignal.removeEventListener('abort', abortHandler);
+    }
+  });
+
+  return fetchPromise;
 };

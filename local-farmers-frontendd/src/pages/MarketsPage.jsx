@@ -236,7 +236,7 @@ export default function MarketsPage() {
               <p className="label">Products from vendors</p>
               {market.products && market.products.length > 0 ? (
                 <ul>
-                  {market.products.slice(0, 4).map((product) => {
+                  {market.products.slice(0, 6).map((product) => {
                     const resolvedImage = product.image?.url
                       ? product.image
                       : productImages[product.id];

@@ -1,6 +1,14 @@
 const path = require('path');
 
-const DATA_DIR = path.resolve(__dirname, '..', '..', '..', 'data');
+const resolveDataDir = () => {
+  const envDir = process.env.DATA_DIR || process.env.LF_DATA_DIR;
+  if (!envDir) {
+    return path.resolve(__dirname, '..', '..', '..', 'data');
+  }
+  return path.isAbsolute(envDir) ? envDir : path.resolve(process.cwd(), envDir);
+};
+
+const DATA_DIR = resolveDataDir();
 const CACHE_DIR = path.join(DATA_DIR, 'cache');
 
 const paths = {
