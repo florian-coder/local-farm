@@ -13,6 +13,20 @@
       "passwordHash": "42dd309a8a038569b75f0874e4c9e229:a9366a3d697eccae2fee6c04e9a45b7e90ce2988009ecb2a83296a778272a13ed9e2d26f36d29687a77ad648ff1efa06acfa0e163b57fc34d28729666ffe3a59",
       "role": "customer",
       "createdAt": "2026-01-20T21:36:14.507Z"
+    },
+    {
+      "id": "b7e70b03-1988-4a38-8b5b-1898a862f4cc",
+      "username": "florian2005rizzler",
+      "passwordHash": "c3a3be6e23445e52f8e1d222c7b0f2a5:6164d443d7b9b9f6bd8b93ed77cf85f5e45fc07a3c6d307a0e89e1dc93484bd2457bb11274cc3ce9e5dcaef64fa74f98f33567e6639f942ff0ea29d7a059be27",
+      "role": "vendor",
+      "createdAt": "2026-02-24T15:37:52.450Z"
+    },
+    {
+      "id": "b188e612-942b-4a3a-8171-6f19a804131e",
+      "username": "susaiflorian24dasdsad",
+      "passwordHash": "97b34effa4f41f1db7de9908260de4be:849e3d09bf835a023dc1bf2974ea154575f543a9ccd3749389e580c48ce111afbe4d1914388611e42eae6c0f02966bcad9f46c507ca97781defcb30de48bb408",
+      "role": "vendor",
+      "createdAt": "2026-02-24T17:38:17.231Z"
     }
   ]
 }

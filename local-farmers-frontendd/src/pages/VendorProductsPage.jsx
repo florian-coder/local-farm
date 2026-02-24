@@ -1,0 +1,214 @@
+import { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
+
+import {
+  apiFetch,
+  isUploadImage,
+  resolveImageUrl,
+  resolveUploadUrl,
+} from '../lib/api.js';
+import { useAuth } from '../lib/auth.jsx';
+
+export default function VendorProductsPage() {
+  const { status: authStatus, user } = useAuth();
+  const [products, setProducts] = useState([]);
+  const [status, setStatus] = useState({
+    state: 'loading',
+    message: '',
+  });
+
+  useEffect(() => {
+    if (authStatus !== 'authenticated' || !user || user.role !== 'vendor') {
+      return;
+    }
+
+    let active = true;
+
+    const loadProducts = async () => {
+      try {
+        const response = await apiFetch('/api/vendor/products', { method: 'GET' });
+        const data = await response.json();
+        if (!active) {
+          return;
+        }
+        setProducts(data.products || []);
+        setStatus({ state: 'success', message: '' });
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+        setStatus({
+          state: 'error',
+          message: 'Unable to load products.',
+        });
+      }
+    };
+
+    loadProducts();
+
+    return () => {
+      active = false;
+    };
+  }, [authStatus, user]);
+
+  const handleDeleteProduct = async (productId) => {
+    if (!productId) {
+      return;
+    }
+    const confirmed = window.confirm('Delete this product?');
+    if (!confirmed) {
+      return;
+    }
+
+    try {
+      const response = await apiFetch(`/api/vendor/products/${productId}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Unable to delete product.');
+      }
+      setProducts((prev) => prev.filter((product) => product.id !== productId));
+    } catch (error) {
+      alert(error.message || 'Unable to delete product.');
+    }
+  };
+
+  if (authStatus === 'loading') {
+    return <div className="notice">Loading products...</div>;
+  }
+
+  if (!user || user.role !== 'vendor') {
+    return (
+      <div className="page-section">
+        <h1>Vendor access required</h1>
+        <p className="muted">
+          Log in with a vendor account to view your products.
+        </p>
+        <Link className="button primary" to="/auth/login">
+          Log in
+        </Link>
+      </div>
+    );
+  }
+
+  return (
+    <div className="page-section">
+      <div className="section-header">
+        <div>
+          <h1>My uploaded products</h1>
+          <p className="muted">Manage your product listings.</p>
+        </div>
+        <div className="button-group">
+          <Link className="button ghost" to="/vendor">
+            Vendor Dashboard
+          </Link>
+          <Link className="button ghost" to="/markets">
+            View markets
+          </Link>
+        </div>
+      </div>
+
+      <div className="form-card">
+        {status.state === 'loading' && <div className="notice">Loading...</div>}
+        {status.state === 'error' && <div className="notice error">{status.message}</div>}
+
+        <div className="products-list">
+          {products.length === 0 && status.state === 'success' ? (
+            <p className="muted">No products added yet.</p>
+          ) : (
+            products.map((product) => {
+              const isUpload = isUploadImage(product.image);
+              const imageUrl = product.image?.url
+                ? isUpload
+                  ? resolveUploadUrl(product.image.url)
+                  : resolveImageUrl(product.image.url)
+                : null;
+              return (
+                <div className="product-row" key={product.id}>
+                  <div className="product-info">
+                    <div className="product-thumb">
+                      {imageUrl ? (
+                        <img
+                          src={imageUrl}
+                          alt={product.image.alt || product.name}
+                        />
+                      ) : (
+                        <span>{product.name?.charAt(0)?.toUpperCase() || '?'}</span>
+                      )}
+                    </div>
+                    <div className="product-details">
+                      <div className="product-title">
+                        <strong>{product.name}</strong>
+                        {product.type && (
+                          <span className="muted">({product.type})</span>
+                        )}
+                      </div>
+                      <p className="muted product-meta">
+                        {product.category === 'fruits_and_vegetables'
+                          ? 'Fruits and Vegetables'
+                          : product.category === 'meat'
+                            ? 'Meat'
+                            : product.category === 'dairy_products'
+                              ? 'Dairy Products'
+                              : product.category}{' '}
+                        · {product.unit} · ${product.price}{' '}
+                        ·{' '}
+                        {product.rating ? `Rating ${product.rating}/5` : 'Rating N/A'}
+                        {product.isBio ? ' · Bio Verified' : ' · Conventional'}
+                      </p>
+                      {isUpload ? (
+                        <span className="badge ghost">Uploaded photo</span>
+                      ) : (
+                        product.image?.photographer &&
+                          product.image?.photoUrl && (
+                            <p className="muted photo-credit">
+                              Photo by{' '}
+                              <a
+                                href={
+                                  product.image.photographerUrl || product.image.photoUrl
+                                }
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                {product.image.photographer}
+                              </a>{' '}
+                              on{' '}
+                              <a
+                                href={product.image.photoUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                Pexels
+                              </a>
+                            </p>
+                          )
+                      )}
+                    </div>
+                  </div>
+                  <div className="product-actions">
+                    <span className={product.available ? 'badge' : 'badge ghost'}>
+                      {product.available ? 'Available' : 'Unavailable'}
+                    </span>
+                    <button
+                      className="button ghost small"
+                      type="button"
+                      onClick={() => handleDeleteProduct(product.id)}
+                    >
+                      Delete
+                    </button>
+                  </div>
+                </div>
+              );
+            })
+          )}
+        </div>
+        <p className="muted photo-credit">
+          <a href="https://www.pexels.com" target="_blank" rel="noreferrer">
+            Photos provided by Pexels
+          </a>
+        </p>
+      </div>
+    </div>
+  );
+}

@@ -4,6 +4,7 @@ const cors = require('cors');
 const morgan = require('morgan');
 const cookieParser = require('cookie-parser');
 
+const path = require('path');
 const healthRouter = require('./routes/health');
 const authRouter = require('./routes/auth');
 const vendorRouter = require('./routes/vendor');
@@ -14,11 +15,17 @@ const { bootstrapData } = require('./lib/bootstrap');
 
 const app = express();
 
+app.set('trust proxy', true);
+
 const allowedOrigins = process.env.CORS_ORIGINS
   ? process.env.CORS_ORIGINS.split(',').map((origin) => origin.trim())
   : ['http://localhost:5173'];
 
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  }),
+);
 app.use(
   cors({
     origin: allowedOrigins,
@@ -29,6 +36,16 @@ app.use(
 app.use(morgan('dev'));
 app.use(express.json({ limit: '1mb' }));
 app.use(cookieParser());
+const uploadsPath = path.join(__dirname, '../public/uploads');
+app.use(
+  '/uploads',
+  (req, res, next) => {
+    res.setHeader('Cross-Origin-Resource-Policy', 'cross-origin');
+    next();
+  },
+  express.static(uploadsPath),
+);
+app.use(express.static(path.join(__dirname, '../public')));
 
 bootstrapData().catch((error) => {
   console.error('Failed to initialize data files', error);

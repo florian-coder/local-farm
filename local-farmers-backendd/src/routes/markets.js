@@ -21,6 +21,53 @@ const NEWS_IMAGE_QUERY = {
 
 const isNumber = (value) => typeof value === 'number' && Number.isFinite(value);
 
+const isLocalUpload = (image) => {
+  const url = image?.url;
+  return (
+    typeof url === 'string' &&
+    (url.startsWith('/uploads') ||
+      url.startsWith('uploads/') ||
+      url.includes('/uploads/'))
+  );
+};
+
+const toAbsoluteUploadUrl = (req, url) => {
+  if (typeof url !== 'string') {
+    return url;
+  }
+  if (!url.startsWith('/uploads') && !url.startsWith('uploads/')) {
+    return url;
+  }
+  const base = `${req.protocol}://${req.get('host')}`;
+  const normalized = url.startsWith('/') ? url : `/${url}`;
+  return `${base}${normalized}`;
+};
+
+const normalizeUploadImage = (req, image) => {
+  if (!image?.url || !isLocalUpload(image)) {
+    return image;
+  }
+  const normalizedUrl = toAbsoluteUploadUrl(req, image.url);
+  return {
+    ...image,
+    url: normalizedUrl,
+    photoUrl: image.photoUrl
+      ? toAbsoluteUploadUrl(req, image.photoUrl)
+      : image.photoUrl,
+    source: image.source || 'upload',
+  };
+};
+
+const shouldFetchStockImage = (image) => {
+  if (!image?.url) {
+    return true;
+  }
+  if (image?.source === 'upload' || isLocalUpload(image)) {
+    return false;
+  }
+  return !image?.photoUrl || !image?.photographer;
+};
+
 const toTimestamp = (value) => {
   const time = Date.parse(value);
   return Number.isFinite(time) ? time : 0;
@@ -45,8 +92,9 @@ const distanceKm = (lat1, lng1, lat2, lng2) => {
   return earthRadiusKm * c;
 };
 
-router.get('/', async (req, res, next) => {
+router.get('/:category', async (req, res, next) => {
   try {
+    const { category } = req.params;
     const marketsData = await readJson(paths.markets, { markets: [] });
     const markets = Array.isArray(marketsData.markets) ? marketsData.markets : [];
     const vendorsData = await readJson(paths.vendors, { vendors: [] });
@@ -54,7 +102,7 @@ router.get('/', async (req, res, next) => {
 
     const vendors = Array.isArray(vendorsData.vendors) ? vendorsData.vendors : [];
     const products = Array.isArray(productsData.products)
-      ? productsData.products
+      ? productsData.products.filter(p => p.category === category)
       : [];
     const vendorsById = new Map(vendors.map((vendor) => [vendor.id, vendor]));
     const productsWithVendors = products.map((product) => {
@@ -63,9 +111,12 @@ router.get('/', async (req, res, next) => {
         id: product.id,
         name: product.name,
         category: product.category,
+        type: product.type ?? '',
         unit: product.unit,
+        price: product.price ?? 0,
         available: product.available,
         rating: product.rating ?? null,
+        isBio: product.isBio ?? false,
         image: product.image ?? null,
         createdAt: product.createdAt ?? null,
         vendor: vendor
@@ -83,11 +134,7 @@ router.get('/', async (req, res, next) => {
     const imageUpdates = new Map();
     const hydratedProducts = await Promise.all(
       productsWithVendors.map(async (product) => {
-        const needsImage =
-          !product.image?.url ||
-          !product.image?.photoUrl ||
-          !product.image?.photographer;
-        if (!needsImage) {
+        if (!shouldFetchStockImage(product.image)) {
           return product;
         }
         const image = await getProductImage(product.name);
@@ -199,7 +246,12 @@ router.get('/', async (req, res, next) => {
             : null,
           marketNews: marketNewsWithImages.filter(Boolean).slice(0, 3),
           globalStats,
-          products: marketProducts.slice(0, MARKET_PRODUCTS_LIMIT),
+          products: marketProducts
+            .slice(0, MARKET_PRODUCTS_LIMIT)
+            .map((product) => ({
+              ...product,
+              image: normalizeUploadImage(req, product.image),
+            })),
         };
       }),
     );

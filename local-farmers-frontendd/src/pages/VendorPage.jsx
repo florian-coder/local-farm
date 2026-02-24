@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { apiFetch } from '../lib/api.js';
+import { apiFetch, getApiBase } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 
 const initialProfile = {
@@ -14,10 +14,14 @@ const initialProfile = {
 
 const initialProduct = {
   name: '',
-  category: 'vegetable',
+  category: 'fruits_and_vegetables',
+  type: '',
   unit: 'kg',
+  price: 0,
   available: true,
   rating: 4.0,
+  isBio: false,
+  photo: null,
 };
 
 export default function VendorPage() {
@@ -33,6 +37,8 @@ export default function VendorPage() {
     state: 'idle',
     message: '',
   });
+  const [photoPreview, setPhotoPreview] = useState(null);
+  const [photoInputKey, setPhotoInputKey] = useState(0);
 
   useEffect(() => {
     if (authStatus !== 'authenticated' || !user || user.role !== 'vendor') {
@@ -95,6 +101,16 @@ export default function VendorPage() {
     };
   }, [authStatus, user]);
 
+  useEffect(() => {
+    if (!productForm.photo) {
+      setPhotoPreview(null);
+      return;
+    }
+    const previewUrl = URL.createObjectURL(productForm.photo);
+    setPhotoPreview(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [productForm.photo]);
+
   const handleProfileChange = (event) => {
     const { name, value } = event.target;
     setProfile((prev) => ({ ...prev, [name]: value }));
@@ -136,11 +152,16 @@ export default function VendorPage() {
   };
 
   const handleProductChange = (event) => {
-    const { name, value, type, checked } = event.target;
+    const { name, value, type, checked, files } = event.target;
     setProductForm((prev) => ({
       ...prev,
-      [name]: type === 'checkbox' ? checked : value,
+      [name]: type === 'checkbox' ? checked : type === 'file' ? files[0] : value,
     }));
+  };
+
+  const handleClearPhoto = () => {
+    setProductForm((prev) => ({ ...prev, photo: null }));
+    setPhotoInputKey((prev) => prev + 1);
   };
 
   const handleProductSubmit = async (event) => {
@@ -148,12 +169,42 @@ export default function VendorPage() {
     setProductStatus({ state: 'loading', message: 'Adding product...' });
 
     try {
+      let imageUrl = null;
+      if (productForm.photo) {
+        const formData = new FormData();
+        formData.append('photo', productForm.photo);
+        const baseUrl = getApiBase();
+        const uploadUrl = `${baseUrl}/api/vendor/upload-image`;
+        console.log('Uploading to:', uploadUrl);
+        const uploadResponse = await fetch(uploadUrl, {
+          method: 'POST',
+          body: formData,
+          credentials: 'include',
+        });
+
+        const contentType = uploadResponse.headers.get('content-type');
+        if (contentType && contentType.includes('application/json')) {
+          const uploadData = await uploadResponse.json();
+          if (!uploadResponse.ok) {
+            throw new Error(uploadData.error || 'Failed to upload image.');
+          }
+          imageUrl = uploadData.imageUrl;
+        } else {
+          const errorText = await uploadResponse.text();
+          console.error('Non-JSON response from server:', errorText);
+          throw new Error(`Server returned non-JSON response (${uploadResponse.status}). Check console for details.`);
+        }
+      }
+
+      const payload = {
+        ...productForm,
+        rating: Number(productForm.rating),
+        imageUrl,
+      };
+      delete payload.photo;
       const response = await apiFetch('/api/vendor/products', {
         method: 'POST',
-        body: JSON.stringify({
-          ...productForm,
-          rating: Number(productForm.rating),
-        }),
+        body: JSON.stringify(payload),
       });
       const data = await response.json();
       if (!response.ok) {
@@ -161,6 +212,7 @@ export default function VendorPage() {
       }
       setProducts((prev) => [...prev, data.product]);
       setProductForm(initialProduct);
+      setPhotoInputKey((prev) => prev + 1);
       setProductStatus({ state: 'success', message: 'Product added.' });
     } catch (error) {
       setProductStatus({
@@ -314,12 +366,28 @@ export default function VendorPage() {
             </label>
             <label className="field">
               Category
-              <input
-                type="text"
+              <select
                 name="category"
                 value={productForm.category}
                 onChange={handleProductChange}
+              >
+                <option value="fruits_and_vegetables">Fruits and Vegetables</option>
+                <option value="meat">Meat</option>
+                <option value="dairy_products">Dairy Products</option>
+              </select>
+            </label>
+            <label className="field">
+              Variety / Type
+              <input
+                type="text"
+                name="type"
+                placeholder="e.g. Beef Brisket, Goat Milk, Cherry Tomato"
+                value={productForm.type}
+                onChange={handleProductChange}
               />
+              <p className="muted" style={{ fontSize: '0.8em', marginTop: '0.2rem' }}>
+                Specify details: e.g., which meat cut, type of milk, or specific vegetable variety.
+              </p>
             </label>
             <label className="field">
               Unit
@@ -330,6 +398,59 @@ export default function VendorPage() {
                 onChange={handleProductChange}
               />
             </label>
+            <label className="field">
+              Price
+              <input
+                type="number"
+                name="price"
+                step="0.01"
+                min="0"
+                value={productForm.price}
+                onChange={handleProductChange}
+                required
+              />
+            </label>
+            <div className="upload-card">
+              <div className="upload-preview">
+                {photoPreview ? (
+                  <img src={photoPreview} alt="Selected product" />
+                ) : (
+                  <div className="upload-placeholder">No photo selected</div>
+                )}
+              </div>
+              <div className="upload-controls">
+                <label className="field">
+                  Product photo
+                  <input
+                    key={photoInputKey}
+                    type="file"
+                    name="photo"
+                    accept="image/*"
+                    onChange={handleProductChange}
+                  />
+                </label>
+                <p className="muted upload-hint">
+                  Optional. Max 5MB · JPG, PNG, or WebP. Defaults to a stock photo if left empty.
+                </p>
+                {productForm.photo && (
+                  <div className="upload-meta">
+                    <span>{productForm.photo.name}</span>
+                    <span>
+                      {(productForm.photo.size / (1024 * 1024)).toFixed(1)} MB
+                    </span>
+                  </div>
+                )}
+                {productForm.photo && (
+                  <button
+                    className="button ghost small"
+                    type="button"
+                    onClick={handleClearPhoto}
+                  >
+                    Remove photo
+                  </button>
+                )}
+              </div>
+            </div>
             <label className="field">
               Rating (1-5)
               <input
@@ -346,95 +467,43 @@ export default function VendorPage() {
             <label className="field checkbox">
               <input
                 type="checkbox"
+                name="isBio"
+                checked={productForm.isBio}
+                onChange={handleProductChange}
+              />
+              Bio Verified
+            </label>
+            <label className="field checkbox">
+              <input
+                type="checkbox"
                 name="available"
                 checked={productForm.available}
                 onChange={handleProductChange}
               />
               Available now
             </label>
-            <button
-              className="button secondary"
-              type="submit"
-              disabled={productStatus.state === 'loading'}
-            >
-              {productStatus.state === 'loading' ? 'Adding...' : 'Add product'}
-            </button>
-            {productStatus.message && (
-              <p
-                className={`notice ${
-                  productStatus.state === 'error' ? 'error' : 'success'
-                }`}
+            <div className="form-actions">
+              <button
+                className="button secondary"
+                type="submit"
+                disabled={productStatus.state === 'loading'}
               >
-                {productStatus.message}
-              </p>
-            )}
+                {productStatus.state === 'loading' ? 'Adding...' : 'Add product'}
+              </button>
+              {productStatus.message && (
+                <p
+                  className={`notice ${
+                    productStatus.state === 'error' ? 'error' : 'success'
+                  }`}
+                >
+                  {productStatus.message}
+                </p>
+              )}
+              <Link className="button ghost" to="/vendor/products_uploaded">
+                View all my products
+              </Link>
+            </div>
           </form>
-
-          <div className="products-list">
-            {products.length === 0 ? (
-              <p className="muted">No products added yet.</p>
-            ) : (
-              products.map((product) => (
-                <div className="product-row" key={product.id}>
-                  <div className="product-info">
-                    <div className="product-thumb">
-                      {product.image?.url ? (
-                        <img src={product.image.url} alt={product.image.alt || product.name} />
-                      ) : (
-                        <span>{product.name?.charAt(0)?.toUpperCase() || '?'}</span>
-                      )}
-                    </div>
-                    <div>
-                      <strong>{product.name}</strong>
-                      <p className="muted">
-                        {product.category} · {product.unit} ·{' '}
-                        {product.rating
-                          ? `Rating ${product.rating}/5`
-                          : 'Rating N/A'}
-                      </p>
-                      {product.image?.photographer && product.image?.photoUrl && (
-                        <p className="muted photo-credit">
-                          Photo by{' '}
-                          <a
-                            href={product.image.photographerUrl || product.image.photoUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            {product.image.photographer}
-                          </a>{' '}
-                          on{' '}
-                          <a
-                            href={product.image.photoUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                          >
-                            Pexels
-                          </a>
-                        </p>
-                      )}
-                    </div>
-                  </div>
-                  <div className="product-actions">
-                    <span className={product.available ? 'badge' : 'badge ghost'}>
-                      {product.available ? 'Available' : 'Unavailable'}
-                    </span>
-                    <button
-                      className="button ghost small"
-                      type="button"
-                      onClick={() => handleDeleteProduct(product.id)}
-                    >
-                      Delete
-                    </button>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-          <p className="muted photo-credit">
-            <a href="https://www.pexels.com" target="_blank" rel="noreferrer">
-              Photos provided by Pexels
-            </a>
-          </p>
         </div>
       </div>
     </div>

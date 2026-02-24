@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useParams } from 'react-router-dom';
 
-import { apiFetch } from '../lib/api.js';
+import {
+  apiFetch,
+  isUploadImage,
+  resolveImageUrl,
+  resolveUploadUrl,
+} from '../lib/api.js';
 import { getQualityLabel } from '../lib/quality.js';
 
 const initialState = {
@@ -11,16 +16,23 @@ const initialState = {
 };
 
 export default function MarketsPage() {
+  const { category } = useParams();
   const [state, setState] = useState(initialState);
   const [productImages, setProductImages] = useState({});
   const requestedImagesRef = useRef(new Set());
+
+  // Search and filter state
+  const [searchQuery, setSearchQuery] = useState('');
+  const [bioFilter, setBioFilter] = useState('all'); // all, bio, conventional
+  const [maxPrice, setMaxPrice] = useState('');
+  const [minRating, setMinRating] = useState('0');
 
   useEffect(() => {
     let active = true;
 
     const loadMarkets = async () => {
       try {
-        const response = await apiFetch('/api/markets', { method: 'GET' });
+        const response = await apiFetch(`/api/markets/${category}`, { method: 'GET' });
         if (!response.ok) {
           throw new Error('Failed to load markets.');
         }
@@ -46,7 +58,7 @@ export default function MarketsPage() {
     return () => {
       active = false;
     };
-  }, []);
+  }, [category]);
 
   useEffect(() => {
     if (state.status !== 'success') {
@@ -121,19 +133,85 @@ export default function MarketsPage() {
     };
   }, [state.status, state.markets]);
 
+  const getPageInfo = () => {
+    switch (category) {
+      case 'fruits_and_vegetables':
+        return {
+          title: 'Fruits and Vegetables Market',
+          description: 'Aggregated market signals, soil health estimates, and live pricing snapshots for fresh produce.',
+          showSoil: true,
+        };
+      case 'meat':
+        return {
+          title: 'Meat Market',
+          description: 'Direct access to local ranchers and butchers, with live pricing on sustainable meat products.',
+          showSoil: false,
+        };
+      case 'dairy_products':
+        return {
+          title: 'Dairy Products Market',
+          description: 'Fresh milk, cheese, and butter from local dairies with quality ratings and bio verification.',
+          showSoil: false,
+        };
+      default:
+        return {
+          title: 'Markets',
+          description: 'Explore our specialized local food markets.',
+          showSoil: true,
+        };
+    }
+  };
+
+  const { title, description, showSoil } = getPageInfo();
+
+  const filterProducts = (products) => {
+    return (products || []).filter((product) => {
+      const matchesSearch = product.name.toLowerCase().includes(searchQuery.toLowerCase());
+      const matchesBio = bioFilter === 'all' || (bioFilter === 'bio' ? product.isBio : !product.isBio);
+      const matchesPrice = maxPrice === '' || product.price <= parseFloat(maxPrice);
+      const matchesRating = product.rating >= parseFloat(minRating);
+      return matchesSearch && matchesBio && matchesPrice && matchesRating;
+    });
+  };
+
   return (
     <div className="page-section">
       <div className="section-header">
         <div>
-          <h1>Browse markets</h1>
-          <p className="muted">
-            Aggregated market signals, soil health estimates, and live pricing
-            snapshots.
-          </p>
+          <h1>{title}</h1>
+          <p className="muted">{description}</p>
         </div>
         <Link className="button ghost" to="/auth/signup?role=vendor">
           Become a vendor
         </Link>
+      </div>
+
+      <div className="filters-bar" style={{ marginBottom: '2rem', padding: '1rem', background: 'var(--surface)', borderRadius: 'var(--radius)', display: 'flex', gap: '1rem', flexWrap: 'wrap', alignItems: 'flex-end' }}>
+        <label className="field" style={{ margin: 0, flex: '1 1 200px' }}>
+          Search products
+          <input type="text" placeholder="Search..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} />
+        </label>
+        <label className="field" style={{ margin: 0 }}>
+          Bio Status
+          <select value={bioFilter} onChange={(e) => setBioFilter(e.target.value)}>
+            <option value="all">All</option>
+            <option value="bio">Bio Verified</option>
+            <option value="conventional">Conventional</option>
+          </select>
+        </label>
+        <label className="field" style={{ margin: 0 }}>
+          Max Price
+          <input type="number" placeholder="Any" value={maxPrice} onChange={(e) => setMaxPrice(e.target.value)} style={{ width: '80px' }} />
+        </label>
+        <label className="field" style={{ margin: 0 }}>
+          Min Rating
+          <select value={minRating} onChange={(e) => setMinRating(e.target.value)}>
+            <option value="0">Any</option>
+            <option value="3">3+ Stars</option>
+            <option value="4">4+ Stars</option>
+            <option value="4.5">4.5+ Stars</option>
+          </select>
+        </label>
       </div>
 
       {state.status === 'loading' && (
@@ -159,21 +237,25 @@ export default function MarketsPage() {
                 <p className="label">Pickup points</p>
                 <p className="value">{market.pickupPoints}</p>
               </div>
-              <div>
-                <p className="label">Soil quality</p>
-                <p className="value">{getQualityLabel(market.soil?.qualityScore)}</p>
+              {showSoil && (
+                <div>
+                  <p className="label">Soil quality</p>
+                  <p className="value">{getQualityLabel(market.soil?.qualityScore)}</p>
+                  <p className="muted">
+                    Score {market.soil?.qualityScore ?? 'N/A'}
+                  </p>
+                </div>
+              )}
+            </div>
+            {showSoil && (
+              <div className="market-soil">
+                <p className="label">Soil snapshot</p>
                 <p className="muted">
-                  Score {market.soil?.qualityScore ?? 'N/A'}
+                  pH {market.soil?.ph ?? '--'} · Organic carbon{' '}
+                  {market.soil?.organicCarbon ?? '--'}
                 </p>
               </div>
-            </div>
-            <div className="market-soil">
-              <p className="label">Soil snapshot</p>
-              <p className="muted">
-                pH {market.soil?.ph ?? '--'} · Organic carbon{' '}
-                {market.soil?.organicCarbon ?? '--'}
-              </p>
-            </div>
+            )}
             <div className="market-news">
               <p className="label">Top market news</p>
               {market.marketNews && market.marketNews.length > 0 ? (
@@ -184,7 +266,7 @@ export default function MarketsPage() {
                         <div className="market-news-thumb">
                           {news.image?.url ? (
                             <img
-                              src={news.image.url}
+                              src={resolveImageUrl(news.image.url)}
                               alt={news.image.alt || news.commodity}
                             />
                           ) : (
@@ -235,66 +317,100 @@ export default function MarketsPage() {
             <div className="market-products">
               <p className="label">Products from vendors</p>
               {market.products && market.products.length > 0 ? (
-                <ul>
-                  {market.products.slice(0, 6).map((product) => {
-                    const resolvedImage = product.image?.url
-                      ? product.image
-                      : productImages[product.id];
+                <div className="categories-list">
+                  {['fruits_and_vegetables', 'meat', 'dairy_products', 'other'].map((catKey) => {
+                    if (catKey !== 'other' && catKey !== category) return null;
+                    const catProducts = filterProducts(market.products).filter(p =>
+                      catKey === 'other'
+                        ? !['fruits_and_vegetables', 'meat', 'dairy_products'].includes(p.category)
+                        : p.category === catKey
+                    );
+                    if (catProducts.length === 0) return null;
+                    const catName = catKey === 'fruits_and_vegetables' ? 'Fruits and Vegetables' : catKey === 'meat' ? 'Meat' : catKey === 'dairy_products' ? 'Dairy Products' : 'Other';
                     return (
-                      <li key={product.id}>
-                        <div className="product-item">
-                          <div className="product-thumb">
-                            {resolvedImage?.url ? (
-                              <img
-                                src={resolvedImage.url}
-                                alt={resolvedImage.alt || product.name}
-                              />
-                            ) : (
-                              <span>
-                                {product.name?.charAt(0)?.toUpperCase() || '?'}
-                              </span>
-                            )}
-                          </div>
-                          <div>
-                            <strong>{product.name}</strong> · {product.unit}{' '}
-                            <span className="muted">
-                              ({product.vendor?.farmName || 'Vendor'})
-                            </span>
-                            <div className="muted">
-                              {product.rating
-                                ? `Rating ${product.rating}/5`
-                                : 'Rating N/A'}
+                      <div key={catKey} className="market-category" style={{ marginBottom: '1rem' }}>
+                        <h4 style={{ margin: '0.5rem 0', fontSize: '1.1em' }}>{catName}</h4>
+                        {['bio', 'conventional'].map((typeKey) => {
+                          const typeProducts = catProducts.filter(p => typeKey === 'bio' ? p.isBio : !p.isBio);
+                          if (typeProducts.length === 0) return null;
+                          return (
+                            <div key={typeKey} className="market-subcategory">
+                              <h5 style={{ margin: '0.5rem 0 0.5rem 0.5rem', color: 'var(--ink-muted)', fontSize: '0.9em' }}>
+                                {typeKey === 'bio' ? 'Bio Verified' : 'Conventional'}
+                              </h5>
+                              <ul>
+                                {typeProducts.map((product) => {
+                                  const resolvedImage = product.image?.url
+                                    ? product.image
+                                    : productImages[product.id];
+                                  const resolvedImageUrl = resolvedImage?.url
+                                    ? isUploadImage(resolvedImage)
+                                      ? resolveUploadUrl(resolvedImage.url)
+                                      : resolveImageUrl(resolvedImage.url)
+                                    : null;
+                                  return (
+                                    <li key={product.id}>
+                                      <div className="product-item">
+                                        <div className="product-thumb">
+                                          {resolvedImageUrl ? (
+                                            <img
+                                              src={resolvedImageUrl}
+                                              alt={resolvedImage.alt || product.name}
+                                            />
+                                          ) : (
+                                            <span>
+                                              {product.name?.charAt(0)?.toUpperCase() || '?'}
+                                            </span>
+                                          )}
+                                        </div>
+                                        <div>
+                                          <strong>{product.name}</strong> {product.type && <span className="muted">({product.type})</span>} · {product.unit} · ${product.price}{' '}
+                                          <span className="muted">
+                                            ({product.vendor?.farmName || 'Vendor'})
+                                          </span>
+                                          <div className="muted">
+                                            {product.rating
+                                              ? `Rating ${product.rating}/5`
+                                              : 'Rating N/A'}
+                                          </div>
+                                          {resolvedImage?.photographer &&
+                                            resolvedImage?.photoUrl &&
+                                            !isUploadImage(resolvedImage) && (
+                                              <div className="muted photo-credit">
+                                                Photo by{' '}
+                                                <a
+                                                  href={
+                                                    resolvedImage.photographerUrl ||
+                                                    resolvedImage.photoUrl
+                                                  }
+                                                  target="_blank"
+                                                  rel="noreferrer"
+                                                >
+                                                  {resolvedImage.photographer}
+                                                </a>{' '}
+                                                on{' '}
+                                                <a
+                                                  href={resolvedImage.photoUrl}
+                                                  target="_blank"
+                                                  rel="noreferrer"
+                                                >
+                                                  Pexels
+                                                </a>
+                                              </div>
+                                            )}
+                                        </div>
+                                      </div>
+                                    </li>
+                                  );
+                                })}
+                              </ul>
                             </div>
-                            {resolvedImage?.photographer &&
-                              resolvedImage?.photoUrl && (
-                                <div className="muted photo-credit">
-                                  Photo by{' '}
-                                  <a
-                                    href={
-                                      resolvedImage.photographerUrl ||
-                                      resolvedImage.photoUrl
-                                    }
-                                    target="_blank"
-                                    rel="noreferrer"
-                                  >
-                                    {resolvedImage.photographer}
-                                  </a>{' '}
-                                  on{' '}
-                                  <a
-                                    href={resolvedImage.photoUrl}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                  >
-                                    Pexels
-                                  </a>
-                                </div>
-                              )}
-                          </div>
-                        </div>
-                      </li>
+                          );
+                        })}
+                      </div>
                     );
                   })}
-                </ul>
+                </div>
               ) : (
                 <p className="muted">No vendor products yet.</p>
               )}

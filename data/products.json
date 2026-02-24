@@ -67,6 +67,63 @@
         "photoUrl": "https://www.pexels.com/ro-ro/fotografie/139248/"
       },
       "createdAt": "2026-01-20T21:41:32.576Z"
+    },
+    {
+      "id": "c01429c2-d00e-4dd0-89d1-3502f00b057b",
+      "vendorId": "a39bbd71-2b5f-4c05-b6c2-f2dd9ebf9fc3",
+      "name": "saf",
+      "category": "fruits_and_vegetables",
+      "type": "das",
+      "unit": "kg",
+      "price": 0,
+      "rating": 4,
+      "available": true,
+      "isBio": false,
+      "image": {
+        "url": "/uploads/3d25791f-1f16-4040-afa9-68ebe460209f.jpeg",
+        "alt": "saf photo",
+        "photographer": "User",
+        "photoUrl": "/uploads/3d25791f-1f16-4040-afa9-68ebe460209f.jpeg"
+      },
+      "createdAt": "2026-02-24T17:12:09.079Z"
+    },
+    {
+      "id": "a405afcd-49d9-401d-aa7a-4a4c1cb94d0f",
+      "vendorId": "a39bbd71-2b5f-4c05-b6c2-f2dd9ebf9fc3",
+      "name": "caiet",
+      "category": "fruits_and_vegetables",
+      "type": "sda",
+      "unit": "kg",
+      "price": 0,
+      "rating": 4,
+      "available": true,
+      "isBio": true,
+      "image": {
+        "url": "/uploads/fe2758df-3309-48bd-8f30-3d341b16dbea.jpeg",
+        "alt": "caiet photo",
+        "photographer": "User",
+        "photoUrl": "/uploads/fe2758df-3309-48bd-8f30-3d341b16dbea.jpeg"
+      },
+      "createdAt": "2026-02-24T17:28:45.670Z"
+    },
+    {
+      "id": "a0aebd63-eb6a-4a7f-836c-3eb65b293eec",
+      "vendorId": "a39bbd71-2b5f-4c05-b6c2-f2dd9ebf9fc3",
+      "name": "dsad",
+      "category": "fruits_and_vegetables",
+      "type": "",
+      "unit": "kg",
+      "price": 0,
+      "rating": 4,
+      "available": true,
+      "isBio": false,
+      "image": {
+        "url": "/uploads/efc718e6-097f-4e7d-a311-55d008149d90.png",
+        "alt": "dsad photo",
+        "photographer": "User",
+        "photoUrl": "/uploads/efc718e6-097f-4e7d-a311-55d008149d90.png"
+      },
+      "createdAt": "2026-02-24T17:37:00.523Z"
     }
   ]
 }

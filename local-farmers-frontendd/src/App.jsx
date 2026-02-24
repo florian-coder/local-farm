@@ -5,6 +5,7 @@ import {
   Routes,
   useLocation,
   useNavigate,
+  Navigate,
 } from 'react-router-dom';
 
 import LandingPage from './pages/LandingPage.jsx';
@@ -12,6 +13,7 @@ import MarketsPage from './pages/MarketsPage.jsx';
 import SignupPage from './pages/SignupPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
 import VendorPage from './pages/VendorPage.jsx';
+import VendorProductsPage from './pages/VendorProductsPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import { AuthProvider, useAuth } from './lib/auth.jsx';
 
@@ -34,8 +36,13 @@ function Navigation() {
         Local Farmers Collective
       </Link>
       <div className="nav-links">
-        <Link to="/markets">Markets</Link>
+        <Link to="/markets/fruits_and_vegetables">Fruits & Vegetables</Link>
+        <Link to="/markets/meat">Meat</Link>
+        <Link to="/markets/dairy_products">Dairy</Link>
         <Link to="/vendor">Vendor</Link>
+        {status === 'authenticated' && user?.role === 'vendor' && (
+          <Link to="/vendor/products_uploaded">My Products</Link>
+        )}
         {showLogin && (
           <Link className="button ghost" to="/auth/login">
             Log in
@@ -63,10 +70,15 @@ function AppShell() {
       <main className="main">
         <Routes>
           <Route path="/" element={<LandingPage />} />
-          <Route path="/markets" element={<MarketsPage />} />
+          <Route
+            path="/markets"
+            element={<Navigate to="/markets/fruits_and_vegetables" />}
+          />
+          <Route path="/markets/:category" element={<MarketsPage />} />
           <Route path="/auth/signup" element={<SignupPage />} />
           <Route path="/auth/login" element={<LoginPage />} />
           <Route path="/vendor" element={<VendorPage />} />
+          <Route path="/vendor/products_uploaded" element={<VendorProductsPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
       </main>

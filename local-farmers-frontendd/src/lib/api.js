@@ -53,3 +53,69 @@ export const apiFetch = (path, options = {}) => {
 
   return fetchPromise;
 };
+
+export const resolveImageUrl = (url) => {
+  if (!url) return null;
+  if (/^(data:|blob:)/i.test(url)) {
+    return url;
+  }
+  if (url.includes('/uploads/') || url.startsWith('uploads/')) {
+    const base = getApiBase();
+    const uploadsIndex = url.indexOf('/uploads/');
+    const relative =
+      uploadsIndex !== -1 ? url.slice(uploadsIndex) : `/${url}`;
+    try {
+      return new URL(relative, base).toString();
+    } catch (error) {
+      return relative;
+    }
+  }
+  if (/^https?:/i.test(url)) {
+    return url;
+  }
+  const base = getApiBase();
+  const normalized = url.startsWith('/') ? url : `/${url}`;
+  try {
+    return new URL(normalized, base).toString();
+  } catch (error) {
+    return url;
+  }
+};
+
+export const resolveUploadUrl = (url) => {
+  if (!url) return null;
+  const base = getApiBase();
+  const uploadsIndex = url.indexOf('/uploads/');
+  let relative = null;
+
+  if (uploadsIndex !== -1) {
+    relative = url.slice(uploadsIndex);
+  } else if (url.startsWith('uploads/')) {
+    relative = `/${url}`;
+  } else if (url.startsWith('/uploads/')) {
+    relative = url;
+  }
+
+  if (!relative) {
+    return url;
+  }
+
+  try {
+    return new URL(relative, base).toString();
+  } catch (error) {
+    return relative;
+  }
+};
+
+export const isUploadImage = (image) => {
+  const url = image?.url;
+  if (!url || typeof url !== 'string') {
+    return false;
+  }
+  return (
+    image?.source === 'upload' ||
+    url.startsWith('/uploads') ||
+    url.startsWith('uploads/') ||
+    url.includes('/uploads/')
+  );
+};
