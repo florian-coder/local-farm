@@ -22,6 +22,7 @@ const bootstrapData = async () => {
   await ensureFile(paths.vendors, { vendors: [] });
   await ensureFile(paths.products, { products: [] });
   await ensureFile(paths.sessions, { sessions: [] });
+  await ensureFile(paths.chats, { conversations: [] });
   await ensureFile(paths.markets, {
     markets: [
       {

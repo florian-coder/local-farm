@@ -384,6 +384,14 @@ export default function MarketsPage() {
                                               ? `Rating ${product.rating}/5`
                                               : 'Rating N/A'}
                                           </div>
+                                          {product.vendor?.id && (
+                                            <Link
+                                              className="button ghost small market-chat-link"
+                                              to={`/chat?vendorId=${product.vendor.id}`}
+                                            >
+                                              Contact farmer
+                                            </Link>
+                                          )}
                                           {resolvedImage?.photographer &&
                                             resolvedImage?.photoUrl &&
                                             !isUploadImage(resolvedImage) && (

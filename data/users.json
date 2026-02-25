@@ -48,7 +48,16 @@
       "username": "customer",
       "passwordHash": "be295ff7c616e6f3e7ccebadd96d45cf:dfd416cfc7ed66f2314ba290079ff117bbb0842dec890bfe2f39f4931490140820d80d0fc447085e3302f9d7ba27882d8edbc54c51449d20b2504a355f6631d7",
       "role": "customer",
-      "createdAt": "2026-02-25T16:16:28.482Z"
+      "createdAt": "2026-02-25T16:16:28.482Z",
+      "firstName": "Florian",
+      "lastName": "Susai",
+      "streetAddress": "sad",
+      "streetNumber": "asd",
+      "phoneNumber": "0799875255",
+      "city": "Chitila",
+      "country": "Romania",
+      "county": "Ilfov",
+      "updatedAt": "2026-02-25T16:49:40.304Z"
     },
     {
       "id": "bc00d760-6685-4248-a720-75f30f3694fa",
@@ -56,6 +65,29 @@
       "passwordHash": "56b878aaf16d67443062550091d6a71d:96aecbe3e1f34908858b26db6a0da99e68281062e45c2dea4b3fcbb82418a563852e37a8f5299366bc32e4ac4908ab6e5efb4f39e3c7a5ece8cf1e0fca4c37e6",
       "role": "vendor",
       "createdAt": "2026-02-25T16:18:17.848Z"
+    },
+    {
+      "id": "7db33c30-e1db-4225-8b0a-289a72a4989b",
+      "username": "customer2",
+      "passwordHash": "c40e0ee926281795ec80cf1feb2c07ea:8193e9a1c7adefb6c668c836e33e57c6c64eb4e5c36574c8ba24d8ba209dfc4bd39cd2852a31cd946ef271b59cb2aabf1954d1533dd442f650fbfcac84f65c7c",
+      "role": "customer",
+      "createdAt": "2026-02-25T16:50:40.773Z",
+      "firstName": "Florian2",
+      "lastName": "Susai2",
+      "streetAddress": "sdssa",
+      "streetNumber": "dasdad",
+      "phoneNumber": "0799875255",
+      "city": "Chitila",
+      "country": "Romania",
+      "county": "Ilfov",
+      "updatedAt": "2026-02-25T16:52:55.314Z"
+    },
+    {
+      "id": "6788b6e3-857d-4ac4-ad81-73f64ad22dca",
+      "username": "vendor2",
+      "passwordHash": "f7935575b56b65d503d9b71f5771bc50:60f58827c16575cb1f88d3a9c99856a1d7bae9e5533a22a30305590384ebcd775f3c9736beebfa6bebef9fcd8a7f0855c90205658b708f2a5248a4214f77a436",
+      "role": "vendor",
+      "createdAt": "2026-02-25T16:51:27.967Z"
     }
   ]
 }

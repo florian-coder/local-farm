@@ -919,6 +919,169 @@ a {
   font-size: 1.05rem;
 }
 
+.chat-layout {
+  display: grid;
+  gap: 16px;
+  grid-template-columns: minmax(240px, 320px) 1fr;
+  align-items: start;
+}
+
+.chat-sidebar {
+  display: grid;
+  gap: 12px;
+}
+
+.chat-sidebar h2 {
+  margin: 0;
+}
+
+.chat-conversation-list {
+  display: grid;
+  gap: 8px;
+}
+
+.chat-conversation-item {
+  border: 1px solid rgba(47, 38, 29, 0.12);
+  border-radius: 12px;
+  background: #fffdf9;
+  text-align: left;
+  padding: 10px 12px;
+  cursor: pointer;
+  display: grid;
+  gap: 4px;
+}
+
+.chat-conversation-item.active {
+  border-color: rgba(201, 125, 76, 0.55);
+  background: #fff4e8;
+}
+
+.chat-conversation-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.chat-conversation-title {
+  margin: 0;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.chat-unread-badge {
+  min-width: 22px;
+  height: 22px;
+  border-radius: 999px;
+  background: #c85d44;
+  color: #fff;
+  font-size: 0.75rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+}
+
+.chat-conversation-subtitle,
+.chat-conversation-preview,
+.chat-conversation-time {
+  margin: 0;
+  font-size: 0.85rem;
+}
+
+.chat-main {
+  display: grid;
+  gap: 14px;
+}
+
+.chat-header h2 {
+  margin: 0;
+}
+
+.chat-header p {
+  margin: 4px 0 0;
+}
+
+.chat-messages {
+  display: grid;
+  gap: 10px;
+  max-height: 440px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.chat-message {
+  max-width: min(75%, 560px);
+  border-radius: 14px;
+  padding: 10px 12px;
+  border: 1px solid rgba(47, 38, 29, 0.12);
+  background: #fffdf9;
+  justify-self: start;
+}
+
+.chat-message.own {
+  justify-self: end;
+  background: #fef0df;
+  border-color: rgba(201, 125, 76, 0.3);
+}
+
+.chat-message-meta,
+.chat-message-text,
+.chat-message-time {
+  margin: 0;
+}
+
+.chat-message-meta {
+  font-weight: 700;
+  font-size: 0.82rem;
+}
+
+.chat-message-text {
+  margin-top: 4px;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.chat-message-time {
+  margin-top: 6px;
+  font-size: 0.78rem;
+}
+
+.chat-send-form {
+  display: grid;
+  gap: 10px;
+}
+
+.chat-send-actions {
+  display: grid;
+  gap: 10px;
+}
+
+.market-chat-link {
+  margin-top: 8px;
+}
+
+.nav-chat-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.chat-nav-badge {
+  min-width: 20px;
+  height: 20px;
+  border-radius: 999px;
+  background: #c85d44;
+  color: #fff;
+  font-size: 0.72rem;
+  font-weight: 700;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0 6px;
+}
+
 .market-products .product-thumb {
   width: 88px;
   height: 88px;
@@ -957,6 +1120,14 @@ a {
   .farmer-card-image {
     width: 100%;
     height: 160px;
+  }
+
+  .chat-layout {
+    grid-template-columns: 1fr;
+  }
+
+  .chat-message {
+    max-width: 100%;
   }
 
   .product-row {

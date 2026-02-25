@@ -1,3 +1,4 @@
+import { useEffect, useState } from 'react';
 import {
   BrowserRouter,
   Link,
@@ -13,10 +14,12 @@ import FarmersPage from './pages/FarmersPage.jsx';
 import MarketsPage from './pages/MarketsPage.jsx';
 import SignupPage from './pages/SignupPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
+import ChatPage from './pages/ChatPage.jsx';
 import ProfilePage from './pages/ProfilePage.jsx';
 import VendorPublicProfilePage from './pages/VendorPublicProfilePage.jsx';
 import VendorProductsPage from './pages/VendorProductsPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
+import { apiFetch } from './lib/api.js';
 import { AuthProvider, useAuth } from './lib/auth.jsx';
 
 function Navigation() {
@@ -26,11 +29,56 @@ function Navigation() {
   const isAuthRoute = location.pathname.startsWith('/auth/');
   const showLogin = status !== 'authenticated' && !isAuthRoute;
   const initial = user?.username?.charAt(0)?.toUpperCase() || '?';
+  const isChatEnabled =
+    status === 'authenticated' &&
+    (user?.role === 'customer' || user?.role === 'vendor');
+  const [chatUnreadCount, setChatUnreadCount] = useState(0);
 
   const handleLogout = async () => {
     await logout();
     navigate('/');
   };
+
+  useEffect(() => {
+    if (!isChatEnabled) {
+      setChatUnreadCount(0);
+      return undefined;
+    }
+
+    let active = true;
+    const loadUnread = async () => {
+      try {
+        const response = await apiFetch('/api/chat/conversations', { method: 'GET' });
+        const data = await response.json();
+        if (!active || !response.ok) {
+          return;
+        }
+        const totalUnread = Number(data.totalUnread);
+        if (Number.isFinite(totalUnread) && totalUnread > 0) {
+          setChatUnreadCount(Math.floor(totalUnread));
+          return;
+        }
+        const fallbackUnread = Array.isArray(data.conversations)
+          ? data.conversations.reduce((sum, entry) => {
+              const count = Number(entry.unreadCount);
+              return Number.isFinite(count) ? sum + count : sum;
+            }, 0)
+          : 0;
+        setChatUnreadCount(fallbackUnread > 0 ? Math.floor(fallbackUnread) : 0);
+      } catch (error) {
+        if (active) {
+          setChatUnreadCount(0);
+        }
+      }
+    };
+
+    loadUnread();
+    const timerId = window.setInterval(loadUnread, 4000);
+    return () => {
+      active = false;
+      window.clearInterval(timerId);
+    };
+  }, [isChatEnabled, user?.id, location.pathname]);
 
   return (
     <nav className="nav">
@@ -42,6 +90,14 @@ function Navigation() {
         <Link to="/markets/meat">Meat</Link>
         <Link to="/markets/dairy_products">Dairy</Link>
         <Link to="/farmers">Farmers</Link>
+        {status === 'authenticated' && (
+          <Link className="nav-chat-link" to="/chat">
+            Chat
+            {chatUnreadCount > 0 && (
+              <span className="chat-nav-badge">{chatUnreadCount}</span>
+            )}
+          </Link>
+        )}
         <Link to="/profile">Profile</Link>
         {status === 'authenticated' && user?.role === 'vendor' && (
           <Link to="/vendor/products_uploaded">My Products</Link>
@@ -78,6 +134,7 @@ function AppShell() {
             element={<Navigate to="/markets/fruits_and_vegetables" />}
           />
           <Route path="/farmers" element={<FarmersPage />} />
+          <Route path="/chat" element={<ChatPage />} />
           <Route path="/markets/:category" element={<MarketsPage />} />
           <Route path="/auth/signup" element={<SignupPage />} />
           <Route path="/auth/login" element={<LoginPage />} />

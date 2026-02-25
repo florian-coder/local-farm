@@ -15,6 +15,7 @@ const initialProfile = {
   county: '',
   city: '',
   phoneNumber: '',
+  email: '',
   organicCertificate: '',
   deliveryRadiusKm: '',
   bio: '',
@@ -66,6 +67,7 @@ const mapVendorToProfile = (vendor) => ({
   county: vendor?.county || '',
   city: vendor?.city || '',
   phoneNumber: vendor?.phoneNumber || '',
+  email: vendor?.email || '',
   organicCertificate: vendor?.organicCertificate || '',
   deliveryRadiusKm: vendor?.deliveryRadiusKm ?? '',
   bio: vendor?.bio || '',
@@ -481,6 +483,15 @@ export default function VendorPage() {
               type="tel"
               name="phoneNumber"
               value={profile.phoneNumber}
+              onChange={handleProfileChange}
+            />
+          </label>
+          <label className="field">
+            Email
+            <input
+              type="email"
+              name="email"
+              value={profile.email}
               onChange={handleProfileChange}
             />
           </label>

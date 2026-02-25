@@ -63,6 +63,7 @@ export default function FarmersPage() {
         vendor.city,
         vendor.county,
         vendor.phoneNumber,
+        vendor.email,
       ]
         .filter(Boolean)
         .join(' ')
@@ -126,6 +127,9 @@ export default function FarmersPage() {
                     <p className="muted">
                       {[vendor.city, vendor.county].filter(Boolean).join(', ') ||
                         'Location not provided'}
+                    </p>
+                    <p className="muted">
+                      Email: {vendor.email || 'Not provided'}
                     </p>
                     <p className="muted">
                       Rating:{' '}

@@ -223,6 +223,7 @@ router.post('/profile', requireVendor, async (req, res, next) => {
       county,
       city,
       phoneNumber,
+      email,
       organicCertificate,
       deliveryRadiusKm,
       bio,
@@ -255,6 +256,7 @@ router.post('/profile', requireVendor, async (req, res, next) => {
     const countyValue = normalizeText(county, 120);
     const cityValue = normalizeText(city, 120);
     const phoneNumberValue = normalizeText(phoneNumber, 40);
+    const emailValue = normalizeText(email, 180);
     const organicCertificateValue = normalizeText(organicCertificate, 180);
     const bioValue = normalizeText(bio, 800);
     const deliveryRadiusValue = toNumberOrNull(deliveryRadiusKm);
@@ -299,6 +301,7 @@ router.post('/profile', requireVendor, async (req, res, next) => {
             phoneNumber === undefined
               ? existing.phoneNumber || ''
               : phoneNumberValue,
+          email: email === undefined ? existing.email || '' : emailValue,
           organicCertificate:
             organicCertificate === undefined
               ? existing.organicCertificate || ''
@@ -330,6 +333,7 @@ router.post('/profile', requireVendor, async (req, res, next) => {
         county: countyValue,
         city: cityValue,
         phoneNumber: phoneNumberValue,
+        email: emailValue,
         organicCertificate: organicCertificateValue,
         deliveryRadiusKm: deliveryRadiusValue,
         farmImages: normalizedFarmImages,

@@ -10,6 +10,7 @@ const initialProfile = {
   streetAddress: '',
   streetNumber: '',
   phoneNumber: '',
+  email: '',
   city: '',
   country: '',
   county: '',
@@ -21,6 +22,7 @@ const mapProfile = (profile) => ({
   streetAddress: profile?.streetAddress || '',
   streetNumber: profile?.streetNumber || '',
   phoneNumber: profile?.phoneNumber || '',
+  email: profile?.email || '',
   city: profile?.city || '',
   country: profile?.country || '',
   county: profile?.county || '',
@@ -186,6 +188,16 @@ export default function CustomerProfilePage() {
             type="tel"
             name="phoneNumber"
             value={profile.phoneNumber}
+            onChange={handleChange}
+            required
+          />
+        </label>
+        <label className="field">
+          Email
+          <input
+            type="email"
+            name="email"
+            value={profile.email}
             onChange={handleChange}
             required
           />

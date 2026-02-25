@@ -88,6 +88,7 @@ const toPublicVendor = (req, vendor) => ({
   county: vendor.county || '',
   city: vendor.city || '',
   phoneNumber: vendor.phoneNumber || '',
+  email: vendor.email || '',
   deliveryRadiusKm:
     typeof vendor.deliveryRadiusKm === 'number' &&
     Number.isFinite(vendor.deliveryRadiusKm)

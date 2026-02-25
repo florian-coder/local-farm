@@ -17,6 +17,7 @@ const paths = {
   products: path.join(DATA_DIR, 'products.json'),
   markets: path.join(DATA_DIR, 'markets.json'),
   sessions: path.join(DATA_DIR, 'sessions.json'),
+  chats: path.join(DATA_DIR, 'chats.json'),
   cache: {
     soil: path.join(CACHE_DIR, 'soil.json'),
     usdaMarkets: path.join(CACHE_DIR, 'usda_markets.json'),

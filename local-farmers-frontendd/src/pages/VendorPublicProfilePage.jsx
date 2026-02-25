@@ -113,6 +113,7 @@ export default function VendorPublicProfilePage() {
     { label: 'County', value: vendor?.county },
     { label: 'City', value: vendor?.city },
     { label: 'Phone number', value: vendor?.phoneNumber },
+    { label: 'Email', value: vendor?.email },
     {
       label: 'Delivery radius (km)',
       value:
@@ -131,6 +132,11 @@ export default function VendorPublicProfilePage() {
           <p className="muted">Public farm page</p>
         </div>
         <div className="button-group">
+          {vendor?.id && (
+            <Link className="button primary" to={`/chat?vendorId=${vendor.id}`}>
+              Contact farmer
+            </Link>
+          )}
           <Link className="button ghost" to="/markets/fruits_and_vegetables">
             View markets
           </Link>
@@ -207,6 +213,11 @@ export default function VendorPublicProfilePage() {
                         {product.isBio ? 'Bio verified' : 'Conventional'} ·{' '}
                         {product.available ? 'Available' : 'Unavailable'}
                       </p>
+                      {vendor?.id && (
+                        <Link className="button ghost small" to={`/chat?vendorId=${vendor.id}`}>
+                          Contact farmer
+                        </Link>
+                      )}
                     </div>
                   </div>
                 );
