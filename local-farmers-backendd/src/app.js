@@ -8,6 +8,8 @@ const path = require('path');
 const healthRouter = require('./routes/health');
 const authRouter = require('./routes/auth');
 const vendorRouter = require('./routes/vendor');
+const vendorsRouter = require('./routes/vendors');
+const profileRouter = require('./routes/profile');
 const marketsRouter = require('./routes/markets');
 const externalRouter = require('./routes/external');
 const productsRouter = require('./routes/products');
@@ -58,7 +60,9 @@ app.get('/', (req, res) => {
 app.use('/health', healthRouter);
 app.use('/api/health', healthRouter);
 app.use('/api/auth', authRouter);
+app.use('/api/profile', profileRouter);
 app.use('/api/vendor', vendorRouter);
+app.use('/api/vendors', vendorsRouter);
 app.use('/api/markets', marketsRouter);
 app.use('/api/external', externalRouter);
 app.use('/api/products', productsRouter);

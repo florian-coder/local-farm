@@ -366,7 +366,18 @@ export default function MarketsPage() {
                                         <div>
                                           <strong>{product.name}</strong> {product.type && <span className="muted">({product.type})</span>} · {product.unit} · ${product.price}{' '}
                                           <span className="muted">
-                                            ({product.vendor?.farmName || 'Vendor'})
+                                            (
+                                            {product.vendor?.id ? (
+                                              <Link
+                                                className="market-vendor-link"
+                                                to={`/farms/${product.vendor.id}`}
+                                              >
+                                                {product.vendor?.farmName || 'Vendor'}
+                                              </Link>
+                                            ) : (
+                                              product.vendor?.farmName || 'Vendor'
+                                            )}
+                                            )
                                           </span>
                                           <div className="muted">
                                             {product.rating

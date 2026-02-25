@@ -100,7 +100,7 @@ export default function VendorProductsPage() {
           <p className="muted">Manage your product listings.</p>
         </div>
         <div className="button-group">
-          <Link className="button ghost" to="/vendor">
+          <Link className="button ghost" to="/profile">
             Vendor Dashboard
           </Link>
           <Link className="button ghost" to="/markets">

@@ -10,6 +10,7 @@ const { requireVendor } = require('../middleware/auth');
 const { getProductImage } = require('../lib/productMedia');
 
 const uploadDir = path.join(__dirname, '../../public/uploads');
+const MAX_PROFILE_IMAGES = 10;
 
 const ensureUploadDir = () => {
   fs.mkdirSync(uploadDir, { recursive: true });
@@ -96,11 +97,77 @@ const toNumberOrNull = (value) => {
   return Number.isFinite(parsed) ? parsed : null;
 };
 
+const normalizeText = (value, maxLength = 180) => {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.trim().slice(0, maxLength);
+};
+
+const toRelativeUploadUrl = (url) => {
+  if (typeof url !== 'string') {
+    return null;
+  }
+
+  const trimmed = url.trim();
+  if (!trimmed) {
+    return null;
+  }
+
+  if (trimmed.startsWith('/uploads/')) {
+    return trimmed;
+  }
+  if (trimmed.startsWith('uploads/')) {
+    return `/${trimmed}`;
+  }
+  const uploadsIndex = trimmed.indexOf('/uploads/');
+  if (uploadsIndex !== -1) {
+    return trimmed.slice(uploadsIndex);
+  }
+  return null;
+};
+
+const normalizeFarmImages = (images) => {
+  if (!Array.isArray(images)) {
+    return [];
+  }
+
+  const seen = new Set();
+  const normalized = [];
+  for (const entry of images) {
+    const relativeUrl = toRelativeUploadUrl(entry);
+    if (!relativeUrl || seen.has(relativeUrl)) {
+      continue;
+    }
+    seen.add(relativeUrl);
+    normalized.push(relativeUrl);
+    if (normalized.length >= MAX_PROFILE_IMAGES) {
+      break;
+    }
+  }
+  return normalized;
+};
+
+const normalizeVendorForResponse = (req, vendor) => {
+  if (!vendor) {
+    return null;
+  }
+
+  const farmImages = normalizeFarmImages(vendor.farmImages).map((url) =>
+    toAbsoluteUploadUrl(req, url),
+  );
+
+  return {
+    ...vendor,
+    farmImages,
+  };
+};
+
 router.get('/profile', requireVendor, async (req, res, next) => {
   try {
     const data = await readJson(paths.vendors, { vendors: [] });
     const vendor = data.vendors.find((entry) => entry.userId === req.user.id) || null;
-    return res.json({ vendor });
+    return res.json({ vendor: normalizeVendorForResponse(req, vendor) });
   } catch (error) {
     return next(error);
   }
@@ -125,15 +192,85 @@ router.post('/upload-image', requireVendor, (req, res) => {
   });
 });
 
+router.post('/upload-farm-images', requireVendor, (req, res) => {
+  upload.array('photos', MAX_PROFILE_IMAGES)(req, res, (err) => {
+    if (err instanceof multer.MulterError) {
+      console.error('Multer error:', err);
+      return res.status(400).json({ error: `Upload error: ${err.message}` });
+    } else if (err) {
+      console.error('Unknown upload error:', err);
+      return res.status(500).json({ error: `Server error: ${err.message}` });
+    }
+
+    if (!Array.isArray(req.files) || req.files.length === 0) {
+      return res.status(400).json({ error: 'No images uploaded.' });
+    }
+
+    const images = req.files
+      .map((file) => `/uploads/${file.filename}`)
+      .slice(0, MAX_PROFILE_IMAGES);
+    return res.json({ images });
+  });
+});
+
 router.post('/profile', requireVendor, async (req, res, next) => {
   try {
-    const { farmName, displayName, lat, lng, bio } = req.body || {};
-    if (!farmName || typeof farmName !== 'string') {
+    const {
+      farmName,
+      displayName,
+      streetAddress,
+      streetNumber,
+      county,
+      city,
+      phoneNumber,
+      organicCertificate,
+      deliveryRadiusKm,
+      bio,
+      farmImages,
+    } = req.body || {};
+
+    if (typeof farmName !== 'string' || !farmName.trim()) {
       return res.status(400).json({ error: 'farmName is required.' });
     }
 
-    const latValue = toNumberOrNull(lat);
-    const lngValue = toNumberOrNull(lng);
+    if (
+      farmImages !== undefined &&
+      farmImages !== null &&
+      !Array.isArray(farmImages)
+    ) {
+      return res
+        .status(400)
+        .json({ error: 'farmImages must be an array of upload URLs.' });
+    }
+    if (Array.isArray(farmImages) && farmImages.length > MAX_PROFILE_IMAGES) {
+      return res.status(400).json({
+        error: `farmImages can contain at most ${MAX_PROFILE_IMAGES} images.`,
+      });
+    }
+
+    const farmNameValue = normalizeText(farmName, 120);
+    const displayNameValue = normalizeText(displayName, 120);
+    const streetAddressValue = normalizeText(streetAddress, 180);
+    const streetNumberValue = normalizeText(streetNumber, 40);
+    const countyValue = normalizeText(county, 120);
+    const cityValue = normalizeText(city, 120);
+    const phoneNumberValue = normalizeText(phoneNumber, 40);
+    const organicCertificateValue = normalizeText(organicCertificate, 180);
+    const bioValue = normalizeText(bio, 800);
+    const deliveryRadiusValue = toNumberOrNull(deliveryRadiusKm);
+    const shouldValidateDeliveryRadius =
+      deliveryRadiusKm !== undefined &&
+      deliveryRadiusKm !== null &&
+      deliveryRadiusKm !== '';
+    if (
+      shouldValidateDeliveryRadius &&
+      (deliveryRadiusValue === null || deliveryRadiusValue < 0)
+    ) {
+      return res
+        .status(400)
+        .json({ error: 'deliveryRadiusKm must be a positive number.' });
+    }
+    const normalizedFarmImages = normalizeFarmImages(farmImages);
 
     const vendor = await updateJson(paths.vendors, { vendors: [] }, (data) => {
       const vendors = Array.isArray(data.vendors) ? data.vendors : [];
@@ -143,11 +280,38 @@ router.post('/profile', requireVendor, async (req, res, next) => {
       if (existing) {
         const updated = {
           ...existing,
-          farmName,
-          displayName: displayName || existing.displayName,
-          lat: latValue ?? existing.lat,
-          lng: lngValue ?? existing.lng,
-          bio: bio ?? existing.bio,
+          farmName: farmNameValue,
+          displayName:
+            displayName === undefined
+              ? existing.displayName || req.user.username
+              : displayNameValue || existing.displayName || req.user.username,
+          streetAddress:
+            streetAddress === undefined
+              ? existing.streetAddress || ''
+              : streetAddressValue,
+          streetNumber:
+            streetNumber === undefined
+              ? existing.streetNumber || ''
+              : streetNumberValue,
+          county: county === undefined ? existing.county || '' : countyValue,
+          city: city === undefined ? existing.city || '' : cityValue,
+          phoneNumber:
+            phoneNumber === undefined
+              ? existing.phoneNumber || ''
+              : phoneNumberValue,
+          organicCertificate:
+            organicCertificate === undefined
+              ? existing.organicCertificate || ''
+              : organicCertificateValue,
+          deliveryRadiusKm:
+            deliveryRadiusKm === undefined
+              ? toNumberOrNull(existing.deliveryRadiusKm)
+              : deliveryRadiusValue,
+          farmImages:
+            farmImages === undefined
+              ? normalizeFarmImages(existing.farmImages)
+              : normalizedFarmImages,
+          bio: bio === undefined ? existing.bio || '' : bioValue,
           updatedAt: now,
         };
         const nextVendors = vendors.map((entry) =>
@@ -159,18 +323,24 @@ router.post('/profile', requireVendor, async (req, res, next) => {
       const created = {
         id: crypto.randomUUID(),
         userId: req.user.id,
-        farmName,
-        displayName: displayName || req.user.username,
-        lat: latValue,
-        lng: lngValue,
-        bio: bio || '',
+        farmName: farmNameValue,
+        displayName: displayNameValue || req.user.username,
+        streetAddress: streetAddressValue,
+        streetNumber: streetNumberValue,
+        county: countyValue,
+        city: cityValue,
+        phoneNumber: phoneNumberValue,
+        organicCertificate: organicCertificateValue,
+        deliveryRadiusKm: deliveryRadiusValue,
+        farmImages: normalizedFarmImages,
+        bio: bioValue,
         createdAt: now,
       };
       vendors.push(created);
       return { data: { vendors }, result: created };
     });
 
-    return res.json({ vendor });
+    return res.json({ vendor: normalizeVendorForResponse(req, vendor) });
   } catch (error) {
     return next(error);
   }

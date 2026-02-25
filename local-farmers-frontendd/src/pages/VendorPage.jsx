@@ -1,15 +1,24 @@
 import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { apiFetch, getApiBase } from '../lib/api.js';
+import { apiFetch, getApiBase, resolveImageUrl } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
 
+const MAX_FARM_IMAGES = 10;
+
 const initialProfile = {
+  id: '',
   farmName: '',
   displayName: '',
-  lat: '',
-  lng: '',
+  streetAddress: '',
+  streetNumber: '',
+  county: '',
+  city: '',
+  phoneNumber: '',
+  organicCertificate: '',
+  deliveryRadiusKm: '',
   bio: '',
+  farmImages: [],
 };
 
 const initialProduct = {
@@ -24,10 +33,53 @@ const initialProduct = {
   photo: null,
 };
 
+const normalizeFarmImages = (images) => {
+  if (!Array.isArray(images)) {
+    return [];
+  }
+
+  const seen = new Set();
+  const normalized = [];
+  for (const imageUrl of images) {
+    if (typeof imageUrl !== 'string') {
+      continue;
+    }
+    const trimmed = imageUrl.trim();
+    if (!trimmed || seen.has(trimmed)) {
+      continue;
+    }
+    seen.add(trimmed);
+    normalized.push(trimmed);
+    if (normalized.length >= MAX_FARM_IMAGES) {
+      break;
+    }
+  }
+  return normalized;
+};
+
+const mapVendorToProfile = (vendor) => ({
+  id: vendor?.id || '',
+  farmName: vendor?.farmName || '',
+  displayName: vendor?.displayName || '',
+  streetAddress: vendor?.streetAddress || '',
+  streetNumber: vendor?.streetNumber || '',
+  county: vendor?.county || '',
+  city: vendor?.city || '',
+  phoneNumber: vendor?.phoneNumber || '',
+  organicCertificate: vendor?.organicCertificate || '',
+  deliveryRadiusKm: vendor?.deliveryRadiusKm ?? '',
+  bio: vendor?.bio || '',
+  farmImages: normalizeFarmImages(vendor?.farmImages),
+});
+
 export default function VendorPage() {
   const { status: authStatus, user } = useAuth();
   const [profile, setProfile] = useState(initialProfile);
   const [profileStatus, setProfileStatus] = useState({
+    state: 'idle',
+    message: '',
+  });
+  const [farmUploadStatus, setFarmUploadStatus] = useState({
     state: 'idle',
     message: '',
   });
@@ -39,6 +91,7 @@ export default function VendorPage() {
   });
   const [photoPreview, setPhotoPreview] = useState(null);
   const [photoInputKey, setPhotoInputKey] = useState(0);
+  const [farmImagesInputKey, setFarmImagesInputKey] = useState(0);
 
   useEffect(() => {
     if (authStatus !== 'authenticated' || !user || user.role !== 'vendor') {
@@ -55,13 +108,7 @@ export default function VendorPage() {
           return;
         }
         if (data.vendor) {
-          setProfile({
-            farmName: data.vendor.farmName || '',
-            displayName: data.vendor.displayName || '',
-            lat: data.vendor.lat ?? '',
-            lng: data.vendor.lng ?? '',
-            bio: data.vendor.bio || '',
-          });
+          setProfile(mapVendorToProfile(data.vendor));
         }
       } catch (error) {
         if (!active) {
@@ -121,12 +168,16 @@ export default function VendorPage() {
     setProfileStatus({ state: 'loading', message: 'Saving profile...' });
 
     try {
+      const { id: _profileId, ...profilePayload } = profile;
       const response = await apiFetch('/api/vendor/profile', {
         method: 'POST',
         body: JSON.stringify({
-          ...profile,
-          lat: profile.lat === '' ? null : Number(profile.lat),
-          lng: profile.lng === '' ? null : Number(profile.lng),
+          ...profilePayload,
+          deliveryRadiusKm:
+            profile.deliveryRadiusKm === ''
+              ? null
+              : Number(profile.deliveryRadiusKm),
+          farmImages: normalizeFarmImages(profile.farmImages),
         }),
       });
       const data = await response.json();
@@ -135,13 +186,8 @@ export default function VendorPage() {
       }
       setProfileStatus({ state: 'success', message: 'Profile saved.' });
       if (data.vendor) {
-        setProfile({
-          farmName: data.vendor.farmName || '',
-          displayName: data.vendor.displayName || '',
-          lat: data.vendor.lat ?? '',
-          lng: data.vendor.lng ?? '',
-          bio: data.vendor.bio || '',
-        });
+        setProfile(mapVendorToProfile(data.vendor));
+        setFarmUploadStatus({ state: 'idle', message: '' });
       }
     } catch (error) {
       setProfileStatus({
@@ -149,6 +195,86 @@ export default function VendorPage() {
         message: error.message || 'Unable to save profile.',
       });
     }
+  };
+
+  const handleFarmImagesUpload = async (event) => {
+    const files = Array.from(event.target.files || []);
+    if (files.length === 0) {
+      return;
+    }
+
+    const remainingSlots = MAX_FARM_IMAGES - profile.farmImages.length;
+    if (remainingSlots <= 0) {
+      setFarmUploadStatus({
+        state: 'error',
+        message: `You can upload up to ${MAX_FARM_IMAGES} farm images.`,
+      });
+      setFarmImagesInputKey((prev) => prev + 1);
+      return;
+    }
+
+    const filesToUpload = files.slice(0, remainingSlots);
+    setFarmUploadStatus({ state: 'loading', message: 'Uploading farm images...' });
+
+    try {
+      const formData = new FormData();
+      filesToUpload.forEach((file) => {
+        formData.append('photos', file);
+      });
+      const baseUrl = getApiBase();
+      const uploadResponse = await fetch(`${baseUrl}/api/vendor/upload-farm-images`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+
+      const contentType = uploadResponse.headers.get('content-type');
+      if (!contentType || !contentType.includes('application/json')) {
+        const errorText = await uploadResponse.text();
+        console.error('Non-JSON response from server:', errorText);
+        throw new Error(
+          `Server returned non-JSON response (${uploadResponse.status}).`,
+        );
+      }
+
+      const uploadData = await uploadResponse.json();
+      if (!uploadResponse.ok) {
+        throw new Error(uploadData.error || 'Failed to upload farm images.');
+      }
+
+      const uploadedImages = normalizeFarmImages(uploadData.images);
+      if (uploadedImages.length === 0) {
+        throw new Error('No farm images were returned by the server.');
+      }
+
+      setProfile((prev) => ({
+        ...prev,
+        farmImages: normalizeFarmImages([...prev.farmImages, ...uploadedImages]),
+      }));
+
+      const skippedCount = files.length - filesToUpload.length;
+      setFarmUploadStatus({
+        state: 'success',
+        message:
+          skippedCount > 0
+            ? `Uploaded ${uploadedImages.length} image(s). ${skippedCount} skipped because the limit is ${MAX_FARM_IMAGES}.`
+            : `Uploaded ${uploadedImages.length} image(s).`,
+      });
+    } catch (error) {
+      setFarmUploadStatus({
+        state: 'error',
+        message: error.message || 'Unable to upload farm images.',
+      });
+    } finally {
+      setFarmImagesInputKey((prev) => prev + 1);
+    }
+  };
+
+  const handleRemoveFarmImage = (imageIndex) => {
+    setProfile((prev) => ({
+      ...prev,
+      farmImages: prev.farmImages.filter((_, index) => index !== imageIndex),
+    }));
   };
 
   const handleProductChange = (event) => {
@@ -275,9 +401,16 @@ export default function VendorPage() {
           <h1>Vendor dashboard</h1>
           <p className="muted">Welcome back, {user.username}.</p>
         </div>
-        <Link className="button ghost" to="/markets">
-          View markets
-        </Link>
+        <div className="button-group">
+          {profile.id && (
+            <Link className="button ghost" to={`/farms/${profile.id}`}>
+              View public page
+            </Link>
+          )}
+          <Link className="button ghost" to="/markets">
+            View markets
+          </Link>
+        </div>
       </div>
 
       <div className="vendor-grid">
@@ -304,26 +437,74 @@ export default function VendorPage() {
           </label>
           <div className="field-row">
             <label className="field">
-              Latitude
+              Street address
               <input
-                type="number"
-                step="0.0001"
-                name="lat"
-                value={profile.lat}
+                type="text"
+                name="streetAddress"
+                value={profile.streetAddress}
                 onChange={handleProfileChange}
               />
             </label>
             <label className="field">
-              Longitude
+              Street number
               <input
-                type="number"
-                step="0.0001"
-                name="lng"
-                value={profile.lng}
+                type="text"
+                name="streetNumber"
+                value={profile.streetNumber}
                 onChange={handleProfileChange}
               />
             </label>
           </div>
+          <div className="field-row">
+            <label className="field">
+              County
+              <input
+                type="text"
+                name="county"
+                value={profile.county}
+                onChange={handleProfileChange}
+              />
+            </label>
+            <label className="field">
+              City
+              <input
+                type="text"
+                name="city"
+                value={profile.city}
+                onChange={handleProfileChange}
+              />
+            </label>
+          </div>
+          <label className="field">
+            Phone number
+            <input
+              type="tel"
+              name="phoneNumber"
+              value={profile.phoneNumber}
+              onChange={handleProfileChange}
+            />
+          </label>
+          <label className="field">
+            Organic operator certificate
+            <input
+              type="text"
+              name="organicCertificate"
+              value={profile.organicCertificate}
+              onChange={handleProfileChange}
+              placeholder="Certificate ID or code"
+            />
+          </label>
+          <label className="field">
+            Delivery radius (km)
+            <input
+              type="number"
+              name="deliveryRadiusKm"
+              min="0"
+              step="1"
+              value={profile.deliveryRadiusKm}
+              onChange={handleProfileChange}
+            />
+          </label>
           <label className="field">
             Bio
             <textarea
@@ -333,6 +514,60 @@ export default function VendorPage() {
               onChange={handleProfileChange}
             />
           </label>
+          <label className="field">
+            Farm gallery (up to 10 images)
+            <input
+              key={farmImagesInputKey}
+              type="file"
+              accept="image/*"
+              multiple
+              onChange={handleFarmImagesUpload}
+              disabled={
+                farmUploadStatus.state === 'loading' ||
+                profile.farmImages.length >= MAX_FARM_IMAGES
+              }
+            />
+            <p className="muted upload-hint">
+              {profile.farmImages.length}/{MAX_FARM_IMAGES} uploaded · JPG, PNG, or
+              WebP · max 5MB each.
+            </p>
+            <div className="farm-gallery-grid">
+              {profile.farmImages.length > 0 ? (
+                profile.farmImages.map((imageUrl, imageIndex) => (
+                  <div className="farm-gallery-thumb" key={`${imageUrl}-${imageIndex}`}>
+                    <img
+                      src={resolveImageUrl(imageUrl)}
+                      alt={`Farm image ${imageIndex + 1}`}
+                    />
+                    <button
+                      className="button ghost small farm-gallery-remove"
+                      type="button"
+                      onClick={() => handleRemoveFarmImage(imageIndex)}
+                    >
+                      Remove
+                    </button>
+                  </div>
+                ))
+              ) : (
+                <div className="upload-placeholder farm-gallery-empty">
+                  No farm images uploaded.
+                </div>
+              )}
+            </div>
+          </label>
+          {farmUploadStatus.message && (
+            <p
+              className={`notice ${
+                farmUploadStatus.state === 'error'
+                  ? 'error'
+                  : farmUploadStatus.state === 'success'
+                    ? 'success'
+                    : ''
+              }`}
+            >
+              {farmUploadStatus.message}
+            </p>
+          )}
           <button
             className="button primary"
             type="submit"

@@ -36,11 +36,7 @@ export default function LoginPage() {
 
       setStatus({ state: 'success', message: 'Welcome back.' });
       await refresh();
-      if (data.role === 'vendor') {
-        navigate('/vendor');
-      } else {
-        navigate('/markets');
-      }
+      navigate('/profile');
     } catch (error) {
       setStatus({
         state: 'error',

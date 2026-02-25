@@ -9,10 +9,12 @@ import {
 } from 'react-router-dom';
 
 import LandingPage from './pages/LandingPage.jsx';
+import FarmersPage from './pages/FarmersPage.jsx';
 import MarketsPage from './pages/MarketsPage.jsx';
 import SignupPage from './pages/SignupPage.jsx';
 import LoginPage from './pages/LoginPage.jsx';
-import VendorPage from './pages/VendorPage.jsx';
+import ProfilePage from './pages/ProfilePage.jsx';
+import VendorPublicProfilePage from './pages/VendorPublicProfilePage.jsx';
 import VendorProductsPage from './pages/VendorProductsPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import { AuthProvider, useAuth } from './lib/auth.jsx';
@@ -39,7 +41,8 @@ function Navigation() {
         <Link to="/markets/fruits_and_vegetables">Fruits & Vegetables</Link>
         <Link to="/markets/meat">Meat</Link>
         <Link to="/markets/dairy_products">Dairy</Link>
-        <Link to="/vendor">Vendor</Link>
+        <Link to="/farmers">Farmers</Link>
+        <Link to="/profile">Profile</Link>
         {status === 'authenticated' && user?.role === 'vendor' && (
           <Link to="/vendor/products_uploaded">My Products</Link>
         )}
@@ -74,10 +77,13 @@ function AppShell() {
             path="/markets"
             element={<Navigate to="/markets/fruits_and_vegetables" />}
           />
+          <Route path="/farmers" element={<FarmersPage />} />
           <Route path="/markets/:category" element={<MarketsPage />} />
           <Route path="/auth/signup" element={<SignupPage />} />
           <Route path="/auth/login" element={<LoginPage />} />
-          <Route path="/vendor" element={<VendorPage />} />
+          <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/farms/:vendorId" element={<VendorPublicProfilePage />} />
+          <Route path="/vendor" element={<Navigate to="/profile" replace />} />
           <Route path="/vendor/products_uploaded" element={<VendorProductsPage />} />
           <Route path="*" element={<NotFoundPage />} />
         </Routes>
