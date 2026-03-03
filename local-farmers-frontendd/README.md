@@ -23,3 +23,5 @@ npm run dev
 
 ## Environment
 - `VITE_API_URL` - backend API base URL (default: http://localhost:3000)
+- `VITE_SUPABASE_URL` - Supabase project URL (optional override)
+- `VITE_SUPABASE_PUBLISHABLE_KEY` - Supabase publishable key (optional override)

@@ -23,9 +23,17 @@ npm run dev
 ## Environment
 - `PORT` - API port (default: 3000)
 - `CORS_ORIGINS` - comma-separated list of allowed origins
+- `SUPABASE_URL` - Supabase project URL (defaults to configured project URL)
+- `SUPABASE_PUBLISHABLE_KEY` - Supabase publishable key
+- `SUPABASE_SERVICE_ROLE_KEY` - backend secret key used to bypass restrictive RLS for server writes
+- `SUPABASE_BUCKET_PRODUCT_PHOTOS` - optional override for product image bucket name (default: `product photos`)
+- `SUPABASE_BUCKET_FARMER_PHOTOS` - optional override for farm gallery bucket name (default: `farmer photos`)
+- `SESSION_SECRET` - secret used to sign auth session cookies
 
-## File-based Storage
-Data is stored in JSON files under the repo root `data/` directory (users, vendors, products, markets, cache). This is suitable for local development and hosts with persistent disks.
+## Data Storage
+Primary data is stored in Supabase (`users`, `farmers`, `customers`, `products`, `farm_photos`)
+and media in Supabase Storage buckets (`product-photos`, `farm-photos`).
+Legacy JSON files under `data/` are cleaned up at startup to avoid state conflicts.
 
 ## Optional External API Configuration
 - `USDA_MARKETNEWS_API_KEY` - API key for USDA Market News (if available)

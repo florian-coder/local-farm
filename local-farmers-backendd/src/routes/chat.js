@@ -4,6 +4,7 @@ const crypto = require('crypto');
 const { paths } = require('../lib/dataPaths');
 const { readJson, updateJson } = require('../lib/fileStore');
 const { requireAuth } = require('../middleware/auth');
+const { supabase, TABLES } = require('../lib/supabase');
 
 const router = express.Router();
 
@@ -27,6 +28,73 @@ const toUnreadCount = (value) => {
     return 0;
   }
   return Math.floor(parsed);
+};
+
+const resolveArray = (value) => (Array.isArray(value) ? value : []);
+
+const fetchChatContext = async () => {
+  const [usersResult, customersResult, farmersResult] = await Promise.all([
+    supabase
+      .from(TABLES.users)
+      .select('id, username, email, user_type'),
+    supabase
+      .from(TABLES.customers)
+      .select(
+        'id, name, surname, "address street", "address number", "phone number", city, county, country',
+      ),
+    supabase
+      .from(TABLES.farmers)
+      .select(
+        'id, "farm name", "display name", city, county, "street address", "street number", "phone number", email, bio',
+      ),
+  ]);
+
+  if (usersResult.error) {
+    throw new Error(usersResult.error.message || 'Unable to load users.');
+  }
+  if (customersResult.error) {
+    throw new Error(customersResult.error.message || 'Unable to load customers.');
+  }
+  if (farmersResult.error) {
+    throw new Error(farmersResult.error.message || 'Unable to load farmers.');
+  }
+
+  const customersByUserId = new Map(
+    resolveArray(customersResult.data).map((entry) => [String(entry.id), entry]),
+  );
+  const users = resolveArray(usersResult.data).map((entry) => {
+    const customer = customersByUserId.get(String(entry.id)) || null;
+    return {
+      id: String(entry.id),
+      username: entry.username || '',
+      firstName: customer?.name || '',
+      lastName: customer?.surname || '',
+      streetAddress: customer?.['address street'] || '',
+      streetNumber: customer?.['address number'] || '',
+      phoneNumber: customer?.['phone number'] || '',
+      email: entry.email || '',
+      city: customer?.city || '',
+      county: customer?.county || '',
+      country: customer?.country || '',
+    };
+  });
+
+  const usersById = new Map(users.map((entry) => [String(entry.id), entry]));
+  const vendors = resolveArray(farmersResult.data).map((entry) => ({
+    id: String(entry.id),
+    userId: String(entry.id),
+    farmName: entry['farm name'] || '',
+    displayName: entry['display name'] || '',
+    streetAddress: entry['street address'] || '',
+    streetNumber: entry['street number'] || '',
+    county: entry.county || '',
+    city: entry.city || '',
+    phoneNumber: entry['phone number'] || '',
+    email: entry.email || usersById.get(String(entry.id))?.email || '',
+    bio: entry.bio || '',
+  }));
+
+  return { users, vendors };
 };
 
 const resolveVendorForUser = (user, vendors) => {
@@ -166,14 +234,11 @@ const toConversationDetails = (
 router.get('/conversations', requireAuth, async (req, res, next) => {
   try {
     const chatsData = await readJson(paths.chats, { conversations: [] });
-    const usersData = await readJson(paths.users, { users: [] });
-    const vendorsData = await readJson(paths.vendors, { vendors: [] });
+    const { users, vendors } = await fetchChatContext();
 
     const conversations = Array.isArray(chatsData.conversations)
       ? chatsData.conversations
       : [];
-    const users = Array.isArray(usersData.users) ? usersData.users : [];
-    const vendors = Array.isArray(vendorsData.vendors) ? vendorsData.vendors : [];
 
     const currentVendor = resolveVendorForUser(req.user, vendors);
     const userConversations = conversations.filter((conversation) =>
@@ -217,8 +282,7 @@ router.post('/conversations/start', requireAuth, async (req, res, next) => {
       return res.status(400).json({ error: 'vendorId is required.' });
     }
 
-    const vendorsData = await readJson(paths.vendors, { vendors: [] });
-    const vendors = Array.isArray(vendorsData.vendors) ? vendorsData.vendors : [];
+    const { users, vendors } = await fetchChatContext();
     const vendor = vendors.find((entry) => entry.id === vendorId);
     if (!vendor) {
       return res.status(404).json({ error: 'Vendor not found.' });
@@ -251,8 +315,6 @@ router.post('/conversations/start', requireAuth, async (req, res, next) => {
       return { data: { conversations }, result: created };
     });
 
-    const usersData = await readJson(paths.users, { users: [] });
-    const users = Array.isArray(usersData.users) ? usersData.users : [];
     const usersById = new Map(users.map((user) => [user.id, user]));
     const vendorsById = new Map(vendors.map((entry) => [entry.id, entry]));
 
@@ -286,10 +348,7 @@ router.get('/conversations/:conversationId', requireAuth, async (req, res, next)
       return res.status(404).json({ error: 'Conversation not found.' });
     }
 
-    const usersData = await readJson(paths.users, { users: [] });
-    const vendorsData = await readJson(paths.vendors, { vendors: [] });
-    const users = Array.isArray(usersData.users) ? usersData.users : [];
-    const vendors = Array.isArray(vendorsData.vendors) ? vendorsData.vendors : [];
+    const { users, vendors } = await fetchChatContext();
     const currentVendor = resolveVendorForUser(req.user, vendors);
     if (!canAccessConversation(req.user, currentVendor, conversation)) {
       return res.status(403).json({ error: 'Forbidden' });
@@ -359,8 +418,7 @@ router.post(
         return res.status(404).json({ error: 'Conversation not found.' });
       }
 
-      const vendorsData = await readJson(paths.vendors, { vendors: [] });
-      const vendors = Array.isArray(vendorsData.vendors) ? vendorsData.vendors : [];
+      const { vendors } = await fetchChatContext();
       const currentVendor = resolveVendorForUser(req.user, vendors);
       if (!canAccessConversation(req.user, currentVendor, currentConversation)) {
         return res.status(403).json({ error: 'Forbidden' });

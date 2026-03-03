@@ -1,0 +1,135 @@
+const DEFAULT_MARKETS = [
+  {
+    id: 'm1',
+    name: 'Central Market',
+    lat: 44.4268,
+    lng: 26.1025,
+    pickupPoints: 3,
+    openStands: 12,
+    activeGrowers: 48,
+  },
+];
+
+const normalizeText = (value, maxLength = 180) => {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.trim().slice(0, maxLength);
+};
+
+const toNumberOrNull = (value) => {
+  if (value === null || value === undefined || value === '') {
+    return null;
+  }
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : null;
+};
+
+const toApiRole = (userType) => (userType === 'farmer' ? 'vendor' : 'customer');
+const toDbUserType = (role) => (role === 'vendor' ? 'farmer' : 'customer');
+
+const toBooleanAvailability = (value) => {
+  if (typeof value === 'boolean') {
+    return value;
+  }
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return value !== false;
+  }
+  return parsed === 1;
+};
+
+const toIntFlag = (value) => (value ? 1 : 0);
+
+const mapDbUserToApi = (user) => ({
+  id: String(user.id),
+  username: user.username || '',
+  role: toApiRole(user.user_type),
+});
+
+const mapFarmPhotoRowsToUrls = (rows) => {
+  if (!Array.isArray(rows)) {
+    return [];
+  }
+  return rows
+    .filter((entry) => typeof entry?.image_url === 'string')
+    .sort((a, b) => {
+      if (Boolean(a.is_cover) === Boolean(b.is_cover)) {
+        return Number(a.id || 0) - Number(b.id || 0);
+      }
+      return a.is_cover ? -1 : 1;
+    })
+    .map((entry) => entry.image_url);
+};
+
+const mapFarmerToVendor = (farmer, options = {}) => {
+  const farmImages = mapFarmPhotoRowsToUrls(options.farmPhotos || []);
+  const email =
+    typeof farmer?.email === 'string' && farmer.email
+      ? farmer.email
+      : typeof options.email === 'string'
+        ? options.email
+        : '';
+
+  return {
+    id: String(farmer.id),
+    farmName: farmer['farm name'] || '',
+    displayName: farmer['display name'] || '',
+    streetAddress: farmer['street address'] || '',
+    streetNumber: farmer['street number'] || '',
+    county: farmer.county || '',
+    city: farmer.city || '',
+    phoneNumber: farmer['phone number'] || '',
+    email,
+    organicCertificate: farmer['organic operator certificate'] || '',
+    deliveryRadiusKm: toNumberOrNull(farmer['delivery radius']),
+    bio: farmer.bio || '',
+    farmImages,
+  };
+};
+
+const mapProductImage = (productName, photoUrl) => {
+  if (!photoUrl) {
+    return null;
+  }
+  return {
+    url: photoUrl,
+    alt: `${productName || 'Product'} photo`,
+    source: 'upload',
+    photoUrl,
+    photographer: 'User',
+    photographerUrl: null,
+  };
+};
+
+const mapProductToApi = (product, vendor = null) => ({
+  id: String(product.id),
+  vendorId: String(product.farmer_id),
+  name: product['product name'] || '',
+  category: product.category || 'fruits_and_vegetables',
+  type: product.type || '',
+  unit: product.Unit || 'unit',
+  price:
+    typeof product.Price === 'number' && Number.isFinite(product.Price)
+      ? product.Price
+      : toNumberOrNull(product.Price) || 0,
+  rating: 4,
+  available: toBooleanAvailability(product.available),
+  isBio: toBooleanAvailability(product['bio check']),
+  image: mapProductImage(product['product name'], product['photo url']),
+  vendor,
+});
+
+module.exports = {
+  DEFAULT_MARKETS,
+  normalizeText,
+  toNumberOrNull,
+  toApiRole,
+  toDbUserType,
+  toBooleanAvailability,
+  toIntFlag,
+  mapDbUserToApi,
+  mapFarmPhotoRowsToUrls,
+  mapFarmerToVendor,
+  mapProductToApi,
+};

@@ -1,133 +1,64 @@
 const express = require('express');
 const crypto = require('crypto');
-const fs = require('fs');
 const path = require('path');
 const multer = require('multer');
 
-const { paths } = require('../lib/dataPaths');
-const { readJson, updateJson } = require('../lib/fileStore');
 const { requireVendor } = require('../middleware/auth');
-const { getProductImage } = require('../lib/productMedia');
-
-const uploadDir = path.join(__dirname, '../../public/uploads');
-const MAX_PROFILE_IMAGES = 10;
-
-const ensureUploadDir = () => {
-  fs.mkdirSync(uploadDir, { recursive: true });
-};
-
-const isLocalUpload = (image) => {
-  const url = image?.url;
-  return (
-    typeof url === 'string' &&
-    (url.startsWith('/uploads') ||
-      url.startsWith('uploads/') ||
-      url.includes('/uploads/'))
-  );
-};
-
-const toAbsoluteUploadUrl = (req, url) => {
-  if (typeof url !== 'string') {
-    return url;
-  }
-  if (!url.startsWith('/uploads') && !url.startsWith('uploads/')) {
-    return url;
-  }
-  const base = `${req.protocol}://${req.get('host')}`;
-  const normalized = url.startsWith('/') ? url : `/${url}`;
-  return `${base}${normalized}`;
-};
-
-const normalizeUploadImage = (req, image) => {
-  if (!image?.url || !isLocalUpload(image)) {
-    return image;
-  }
-  const normalizedUrl = toAbsoluteUploadUrl(req, image.url);
-  return {
-    ...image,
-    url: normalizedUrl,
-    photoUrl: image.photoUrl
-      ? toAbsoluteUploadUrl(req, image.photoUrl)
-      : image.photoUrl,
-    source: image.source || 'upload',
-  };
-};
-
-const shouldFetchStockImage = (image) => {
-  if (!image?.url) {
-    return true;
-  }
-  if (image?.source === 'upload' || isLocalUpload(image)) {
-    return false;
-  }
-  return !image?.photoUrl || !image?.photographer;
-};
-
-const storage = multer.diskStorage({
-  destination: (req, file, cb) => {
-    ensureUploadDir();
-    cb(null, uploadDir);
-  },
-  filename: (req, file, cb) => {
-    const ext = path.extname(file.originalname);
-    cb(null, `${crypto.randomUUID()}${ext}`);
-  },
-});
-
-const upload = multer({
-  storage,
-  limits: { fileSize: 5 * 1024 * 1024 }, // 5MB
-  fileFilter: (req, file, cb) => {
-    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
-    if (allowed.includes(file.mimetype)) {
-      cb(null, true);
-    } else {
-      cb(new Error('Invalid file type. Only JPEG, PNG, and WebP are allowed.'));
-    }
-  },
-});
+const { supabase, TABLES, BUCKET_ALIASES } = require('../lib/supabase');
+const {
+  mapFarmerToVendor,
+  mapProductToApi,
+  normalizeText,
+  toIntFlag,
+  toNumberOrNull,
+} = require('../lib/domain');
 
 const router = express.Router();
 
-const toNumberOrNull = (value) => {
-  if (value === null || value === undefined || value === '') {
-    return null;
-  }
-  const parsed = Number(value);
-  return Number.isFinite(parsed) ? parsed : null;
-};
+const MAX_PROFILE_IMAGES = 10;
 
-const normalizeText = (value, maxLength = 180) => {
-  if (typeof value !== 'string') {
-    return '';
-  }
-  return value.trim().slice(0, maxLength);
-};
+const upload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (_req, file, cb) => {
+    const allowed = ['image/jpeg', 'image/png', 'image/webp'];
+    if (allowed.includes(file.mimetype)) {
+      cb(null, true);
+      return;
+    }
+    cb(new Error('Invalid file type. Only JPEG, PNG, and WebP are allowed.'));
+  },
+});
 
-const toRelativeUploadUrl = (url) => {
-  if (typeof url !== 'string') {
-    return null;
-  }
+const FARMER_COLUMNS = [
+  'id',
+  '"farm name"',
+  '"display name"',
+  '"street address"',
+  '"street number"',
+  'city',
+  'county',
+  '"phone number"',
+  'email',
+  '"organic operator certificate"',
+  '"delivery radius"',
+  'bio',
+].join(', ');
 
-  const trimmed = url.trim();
-  if (!trimmed) {
-    return null;
-  }
+const PRODUCT_COLUMNS = [
+  'id',
+  'farmer_id',
+  '"product name"',
+  'category',
+  'type',
+  'Unit',
+  'Price',
+  '"photo url"',
+  '"bio check"',
+  'available',
+].join(', ');
 
-  if (trimmed.startsWith('/uploads/')) {
-    return trimmed;
-  }
-  if (trimmed.startsWith('uploads/')) {
-    return `/${trimmed}`;
-  }
-  const uploadsIndex = trimmed.indexOf('/uploads/');
-  if (uploadsIndex !== -1) {
-    return trimmed.slice(uploadsIndex);
-  }
-  return null;
-};
-
-const normalizeFarmImages = (images) => {
+const normalizePublicUrls = (images) => {
   if (!Array.isArray(images)) {
     return [];
   }
@@ -135,12 +66,15 @@ const normalizeFarmImages = (images) => {
   const seen = new Set();
   const normalized = [];
   for (const entry of images) {
-    const relativeUrl = toRelativeUploadUrl(entry);
-    if (!relativeUrl || seen.has(relativeUrl)) {
+    if (typeof entry !== 'string') {
       continue;
     }
-    seen.add(relativeUrl);
-    normalized.push(relativeUrl);
+    const trimmed = entry.trim();
+    if (!trimmed || seen.has(trimmed)) {
+      continue;
+    }
+    seen.add(trimmed);
+    normalized.push(trimmed);
     if (normalized.length >= MAX_PROFILE_IMAGES) {
       break;
     }
@@ -148,68 +82,243 @@ const normalizeFarmImages = (images) => {
   return normalized;
 };
 
-const normalizeVendorForResponse = (req, vendor) => {
-  if (!vendor) {
-    return null;
+const fetchUserRow = async (userId) => {
+  const { data: user, error } = await supabase
+    .from(TABLES.users)
+    .select('id, username, email')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message || 'Unable to load user.');
+  }
+  return user || null;
+};
+
+const fetchFarmerByUserId = async (userId) => {
+  const { data: farmer, error } = await supabase
+    .from(TABLES.farmers)
+    .select(FARMER_COLUMNS)
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error && error.code !== 'PGRST116') {
+    throw new Error(error.message || 'Unable to load farmer profile.');
+  }
+  return farmer || null;
+};
+
+const createDefaultFarmer = async (user) => {
+  const username = normalizeText(user?.username || 'Farmer', 120) || 'Farmer';
+  const payload = {
+    id: user.id,
+    'farm name': `${username} Farm`,
+    'display name': username,
+    'street address': '',
+    'street number': '',
+    city: '',
+    county: '',
+    'phone number': '',
+    email: user?.email || '',
+    'organic operator certificate': '',
+    'delivery radius': 0,
+    bio: '',
+  };
+
+  const { data: farmer, error } = await supabase
+    .from(TABLES.farmers)
+    .insert(payload)
+    .select(FARMER_COLUMNS)
+    .single();
+
+  if (error) {
+    throw new Error(error.message || 'Unable to create farmer profile.');
+  }
+  return farmer;
+};
+
+const ensureFarmerForUser = async (user) => {
+  const existing = await fetchFarmerByUserId(user.id);
+  if (existing) {
+    return existing;
+  }
+  return createDefaultFarmer(user);
+};
+
+const fetchFarmPhotos = async (farmerId) => {
+  const { data: photos, error } = await supabase
+    .from(TABLES.farmPhotos)
+    .select('id, farmer_id, image_url, caption, is_cover')
+    .eq('farmer_id', farmerId)
+    .order('is_cover', { ascending: false })
+    .order('id', { ascending: true });
+
+  if (error) {
+    throw new Error(error.message || 'Unable to load farm gallery.');
+  }
+  return Array.isArray(photos) ? photos : [];
+};
+
+const syncFarmPhotos = async (farmerId, imageUrls) => {
+  const { error: deleteError } = await supabase
+    .from(TABLES.farmPhotos)
+    .delete()
+    .eq('farmer_id', farmerId);
+  if (deleteError) {
+    throw new Error(deleteError.message || 'Unable to replace farm photos.');
   }
 
-  const farmImages = normalizeFarmImages(vendor.farmImages).map((url) =>
-    toAbsoluteUploadUrl(req, url),
-  );
+  if (!Array.isArray(imageUrls) || imageUrls.length === 0) {
+    return;
+  }
 
-  return {
-    ...vendor,
-    farmImages,
-  };
+  const rows = imageUrls.map((url, index) => ({
+    farmer_id: farmerId,
+    image_url: url,
+    caption: '',
+    is_cover: index === 0,
+  }));
+
+  const { error: insertError } = await supabase
+    .from(TABLES.farmPhotos)
+    .insert(rows);
+  if (insertError) {
+    throw new Error(insertError.message || 'Unable to save farm photos.');
+  }
+};
+
+const getFileExtension = (file) => {
+  const ext = path.extname(file.originalname || '').toLowerCase();
+  if (ext) {
+    return ext;
+  }
+  if (file.mimetype === 'image/png') {
+    return '.png';
+  }
+  if (file.mimetype === 'image/webp') {
+    return '.webp';
+  }
+  return '.jpg';
+};
+
+const isBucketNotFoundError = (error) => {
+  const message =
+    typeof error?.message === 'string' ? error.message.toLowerCase() : '';
+  return message.includes('bucket not found');
+};
+
+const uploadToBucket = async ({ bucketNames, uploadPath, file }) => {
+  for (const bucket of bucketNames) {
+    const { error: uploadError } = await supabase.storage
+      .from(bucket)
+      .upload(uploadPath, file.buffer, {
+        contentType: file.mimetype,
+        upsert: false,
+      });
+
+    if (uploadError) {
+      if (isBucketNotFoundError(uploadError)) {
+        continue;
+      }
+      throw new Error(uploadError.message || 'Upload failed.');
+    }
+
+    const { data: publicData } = supabase.storage
+      .from(bucket)
+      .getPublicUrl(uploadPath);
+    if (!publicData?.publicUrl) {
+      throw new Error('Could not resolve public URL for uploaded image.');
+    }
+    return publicData.publicUrl;
+  }
+
+  throw new Error(
+    `Bucket not found. Tried: ${bucketNames.join(', ')}`,
+  );
+};
+
+const resolveVendorResponse = async (farmer, userEmail) => {
+  const farmPhotos = await fetchFarmPhotos(farmer.id);
+  return mapFarmerToVendor(farmer, {
+    email: userEmail,
+    farmPhotos,
+  });
 };
 
 router.get('/profile', requireVendor, async (req, res, next) => {
   try {
-    const data = await readJson(paths.vendors, { vendors: [] });
-    const vendor = data.vendors.find((entry) => entry.userId === req.user.id) || null;
-    return res.json({ vendor: normalizeVendorForResponse(req, vendor) });
+    const userRow = await fetchUserRow(req.user.id);
+    const farmer = await fetchFarmerByUserId(req.user.id);
+    if (!farmer) {
+      return res.json({ vendor: null });
+    }
+
+    const vendor = await resolveVendorResponse(farmer, userRow?.email || '');
+    return res.json({ vendor });
   } catch (error) {
     return next(error);
   }
 });
 
 router.post('/upload-image', requireVendor, (req, res) => {
-  upload.single('photo')(req, res, (err) => {
-    if (err instanceof multer.MulterError) {
-      console.error('Multer error:', err);
-      return res.status(400).json({ error: `Upload error: ${err.message}` });
-    } else if (err) {
-      console.error('Unknown upload error:', err);
-      return res.status(500).json({ error: `Server error: ${err.message}` });
-    }
+  upload.single('photo')(req, res, async (err) => {
+    try {
+      if (err instanceof multer.MulterError) {
+        return res.status(400).json({ error: `Upload error: ${err.message}` });
+      }
+      if (err) {
+        return res.status(500).json({ error: `Server error: ${err.message}` });
+      }
+      if (!req.file) {
+        return res.status(400).json({ error: 'No file uploaded.' });
+      }
 
-    if (!req.file) {
-      return res.status(400).json({ error: 'No file uploaded.' });
-    }
+      const farmer = await ensureFarmerForUser(req.user);
+      const fileName = `${crypto.randomUUID()}${getFileExtension(req.file)}`;
+      const uploadPath = `${farmer.id}/products/${fileName}`;
+      const publicUrl = await uploadToBucket({
+        bucketNames: BUCKET_ALIASES.productPhotos,
+        uploadPath,
+        file: req.file,
+      });
 
-    const imageUrl = `/uploads/${req.file.filename}`;
-    return res.json({ imageUrl });
+      return res.json({ imageUrl: publicUrl });
+    } catch (uploadError) {
+      return res.status(500).json({ error: uploadError.message || 'Upload failed.' });
+    }
   });
 });
 
 router.post('/upload-farm-images', requireVendor, (req, res) => {
-  upload.array('photos', MAX_PROFILE_IMAGES)(req, res, (err) => {
-    if (err instanceof multer.MulterError) {
-      console.error('Multer error:', err);
-      return res.status(400).json({ error: `Upload error: ${err.message}` });
-    } else if (err) {
-      console.error('Unknown upload error:', err);
-      return res.status(500).json({ error: `Server error: ${err.message}` });
-    }
+  upload.array('photos', MAX_PROFILE_IMAGES)(req, res, async (err) => {
+    try {
+      if (err instanceof multer.MulterError) {
+        return res.status(400).json({ error: `Upload error: ${err.message}` });
+      }
+      if (err) {
+        return res.status(500).json({ error: `Server error: ${err.message}` });
+      }
+      if (!Array.isArray(req.files) || req.files.length === 0) {
+        return res.status(400).json({ error: 'No images uploaded.' });
+      }
 
-    if (!Array.isArray(req.files) || req.files.length === 0) {
-      return res.status(400).json({ error: 'No images uploaded.' });
-    }
+      const farmer = await ensureFarmerForUser(req.user);
+      const urls = [];
+      for (const file of req.files.slice(0, MAX_PROFILE_IMAGES)) {
+        const fileName = `${crypto.randomUUID()}${getFileExtension(file)}`;
+        const uploadPath = `${farmer.id}/gallery/${fileName}`;
+        const publicUrl = await uploadToBucket({
+          bucketNames: BUCKET_ALIASES.farmPhotos,
+          uploadPath,
+          file,
+        });
+        urls.push(publicUrl);
+      }
 
-    const images = req.files
-      .map((file) => `/uploads/${file.filename}`)
-      .slice(0, MAX_PROFILE_IMAGES);
-    return res.json({ images });
+      return res.json({ images: urls });
+    } catch (uploadError) {
+      return res.status(500).json({ error: uploadError.message || 'Upload failed.' });
+    }
   });
 });
 
@@ -233,118 +342,81 @@ router.post('/profile', requireVendor, async (req, res, next) => {
     if (typeof farmName !== 'string' || !farmName.trim()) {
       return res.status(400).json({ error: 'farmName is required.' });
     }
+    if (farmImages !== undefined && !Array.isArray(farmImages)) {
+      return res.status(400).json({ error: 'farmImages must be an array of URLs.' });
+    }
 
+    const deliveryRadius = toNumberOrNull(deliveryRadiusKm);
     if (
-      farmImages !== undefined &&
-      farmImages !== null &&
-      !Array.isArray(farmImages)
-    ) {
-      return res
-        .status(400)
-        .json({ error: 'farmImages must be an array of upload URLs.' });
-    }
-    if (Array.isArray(farmImages) && farmImages.length > MAX_PROFILE_IMAGES) {
-      return res.status(400).json({
-        error: `farmImages can contain at most ${MAX_PROFILE_IMAGES} images.`,
-      });
-    }
-
-    const farmNameValue = normalizeText(farmName, 120);
-    const displayNameValue = normalizeText(displayName, 120);
-    const streetAddressValue = normalizeText(streetAddress, 180);
-    const streetNumberValue = normalizeText(streetNumber, 40);
-    const countyValue = normalizeText(county, 120);
-    const cityValue = normalizeText(city, 120);
-    const phoneNumberValue = normalizeText(phoneNumber, 40);
-    const emailValue = normalizeText(email, 180);
-    const organicCertificateValue = normalizeText(organicCertificate, 180);
-    const bioValue = normalizeText(bio, 800);
-    const deliveryRadiusValue = toNumberOrNull(deliveryRadiusKm);
-    const shouldValidateDeliveryRadius =
       deliveryRadiusKm !== undefined &&
       deliveryRadiusKm !== null &&
-      deliveryRadiusKm !== '';
-    if (
-      shouldValidateDeliveryRadius &&
-      (deliveryRadiusValue === null || deliveryRadiusValue < 0)
+      deliveryRadiusKm !== '' &&
+      (deliveryRadius === null || deliveryRadius < 0)
     ) {
-      return res
-        .status(400)
-        .json({ error: 'deliveryRadiusKm must be a positive number.' });
+      return res.status(400).json({ error: 'deliveryRadiusKm must be a positive number.' });
     }
-    const normalizedFarmImages = normalizeFarmImages(farmImages);
 
-    const vendor = await updateJson(paths.vendors, { vendors: [] }, (data) => {
-      const vendors = Array.isArray(data.vendors) ? data.vendors : [];
-      const existing = vendors.find((entry) => entry.userId === req.user.id);
-      const now = new Date().toISOString();
+    const farmerPayload = {
+      'farm name': normalizeText(farmName, 120),
+      'display name':
+        normalizeText(displayName, 120) || normalizeText(farmName, 120),
+      'street address': normalizeText(streetAddress, 200),
+      'street number': normalizeText(streetNumber, 40),
+      county: normalizeText(county, 120),
+      city: normalizeText(city, 120),
+      'phone number': normalizeText(phoneNumber, 40),
+      email: normalizeText(email, 180),
+      'organic operator certificate': normalizeText(organicCertificate, 200),
+      'delivery radius': deliveryRadius,
+      bio: normalizeText(bio, 1000),
+    };
 
-      if (existing) {
-        const updated = {
-          ...existing,
-          farmName: farmNameValue,
-          displayName:
-            displayName === undefined
-              ? existing.displayName || req.user.username
-              : displayNameValue || existing.displayName || req.user.username,
-          streetAddress:
-            streetAddress === undefined
-              ? existing.streetAddress || ''
-              : streetAddressValue,
-          streetNumber:
-            streetNumber === undefined
-              ? existing.streetNumber || ''
-              : streetNumberValue,
-          county: county === undefined ? existing.county || '' : countyValue,
-          city: city === undefined ? existing.city || '' : cityValue,
-          phoneNumber:
-            phoneNumber === undefined
-              ? existing.phoneNumber || ''
-              : phoneNumberValue,
-          email: email === undefined ? existing.email || '' : emailValue,
-          organicCertificate:
-            organicCertificate === undefined
-              ? existing.organicCertificate || ''
-              : organicCertificateValue,
-          deliveryRadiusKm:
-            deliveryRadiusKm === undefined
-              ? toNumberOrNull(existing.deliveryRadiusKm)
-              : deliveryRadiusValue,
-          farmImages:
-            farmImages === undefined
-              ? normalizeFarmImages(existing.farmImages)
-              : normalizedFarmImages,
-          bio: bio === undefined ? existing.bio || '' : bioValue,
-          updatedAt: now,
-        };
-        const nextVendors = vendors.map((entry) =>
-          entry.userId === req.user.id ? updated : entry,
-        );
-        return { data: { vendors: nextVendors }, result: updated };
+    const existingFarmer = await fetchFarmerByUserId(req.user.id);
+    let farmer = null;
+    if (existingFarmer?.id) {
+      const { data: updatedFarmer, error: updateError } = await supabase
+        .from(TABLES.farmers)
+        .update(farmerPayload)
+        .eq('id', existingFarmer.id)
+        .select(FARMER_COLUMNS)
+        .single();
+      if (updateError) {
+        return res.status(500).json({ error: updateError.message });
       }
+      farmer = updatedFarmer;
+    } else {
+      const { data: insertedFarmer, error: insertError } = await supabase
+        .from(TABLES.farmers)
+        .insert({
+          id: req.user.id,
+          ...farmerPayload,
+        })
+        .select(FARMER_COLUMNS)
+        .single();
+      if (insertError) {
+        return res.status(500).json({ error: insertError.message });
+      }
+      farmer = insertedFarmer;
+    }
 
-      const created = {
-        id: crypto.randomUUID(),
-        userId: req.user.id,
-        farmName: farmNameValue,
-        displayName: displayNameValue || req.user.username,
-        streetAddress: streetAddressValue,
-        streetNumber: streetNumberValue,
-        county: countyValue,
-        city: cityValue,
-        phoneNumber: phoneNumberValue,
-        email: emailValue,
-        organicCertificate: organicCertificateValue,
-        deliveryRadiusKm: deliveryRadiusValue,
-        farmImages: normalizedFarmImages,
-        bio: bioValue,
-        createdAt: now,
-      };
-      vendors.push(created);
-      return { data: { vendors }, result: created };
-    });
+    const normalizedEmail = normalizeText(email, 180);
+    if (normalizedEmail) {
+      const { error: userError } = await supabase
+        .from(TABLES.users)
+        .update({ email: normalizedEmail })
+        .eq('id', req.user.id);
+      if (userError) {
+        return res.status(500).json({ error: userError.message });
+      }
+    }
 
-    return res.json({ vendor: normalizeVendorForResponse(req, vendor) });
+    if (farmImages !== undefined) {
+      const urls = normalizePublicUrls(farmImages);
+      await syncFarmPhotos(farmer.id, urls);
+    }
+
+    const vendor = await resolveVendorResponse(farmer, normalizedEmail || req.user.email || '');
+    return res.json({ vendor });
   } catch (error) {
     return next(error);
   }
@@ -352,49 +424,23 @@ router.post('/profile', requireVendor, async (req, res, next) => {
 
 router.get('/products', requireVendor, async (req, res, next) => {
   try {
-    const vendorsData = await readJson(paths.vendors, { vendors: [] });
-    const vendor = vendorsData.vendors.find((entry) => entry.userId === req.user.id);
-    if (!vendor) {
+    const farmer = await fetchFarmerByUserId(req.user.id);
+    if (!farmer) {
       return res.json({ products: [] });
     }
 
-    const productsData = await readJson(paths.products, { products: [] });
-    const products = productsData.products.filter(
-      (product) => product.vendorId === vendor.id,
-    );
-    const imageUpdates = new Map();
-    const hydratedProducts = await Promise.all(
-      products.map(async (product) => {
-        if (!shouldFetchStockImage(product.image)) {
-          return product;
-        }
-        const image = await getProductImage(product.name);
-        if (image) {
-          imageUpdates.set(product.id, image);
-          return { ...product, image };
-        }
-        return product;
-      }),
-    );
-
-    if (imageUpdates.size > 0) {
-      await updateJson(paths.products, { products: [] }, (data) => {
-        const allProducts = Array.isArray(data.products) ? data.products : [];
-        const nextProducts = allProducts.map((entry) =>
-          imageUpdates.has(entry.id)
-            ? { ...entry, image: imageUpdates.get(entry.id) }
-            : entry,
-        );
-        return { data: { products: nextProducts }, result: null };
-      });
+    const { data: products, error } = await supabase
+      .from(TABLES.products)
+      .select(PRODUCT_COLUMNS)
+      .eq('farmer_id', farmer.id)
+      .order('id', { ascending: false });
+    if (error) {
+      return res.status(500).json({ error: error.message });
     }
 
-    const responseProducts = hydratedProducts.map((product) => ({
-      ...product,
-      image: normalizeUploadImage(req, product.image),
-    }));
-
-    return res.json({ products: responseProducts });
+    return res.json({
+      products: (products || []).map((product) => mapProductToApi(product)),
+    });
   } catch (error) {
     return next(error);
   }
@@ -402,15 +448,17 @@ router.get('/products', requireVendor, async (req, res, next) => {
 
 router.post('/products', requireVendor, async (req, res, next) => {
   try {
-    const { name, category, unit, available, rating, isBio, price, type, imageUrl } = req.body || {};
+    const { name, category, unit, available, rating, isBio, price, type, imageUrl } =
+      req.body || {};
     if (!name || typeof name !== 'string') {
       return res.status(400).json({ error: 'name is required.' });
     }
-    const ratingValue = Number(rating);
-    if (!Number.isFinite(ratingValue) || ratingValue < 1 || ratingValue > 5) {
-      return res
-        .status(400)
-        .json({ error: 'rating must be between 1 and 5.' });
+
+    if (rating !== undefined) {
+      const ratingValue = Number(rating);
+      if (!Number.isFinite(ratingValue) || ratingValue < 1 || ratingValue > 5) {
+        return res.status(400).json({ error: 'rating must be between 1 and 5.' });
+      }
     }
 
     const priceValue = Number(price);
@@ -418,45 +466,34 @@ router.post('/products', requireVendor, async (req, res, next) => {
       return res.status(400).json({ error: 'price must be a positive number.' });
     }
 
-    const vendorsData = await readJson(paths.vendors, { vendors: [] });
-    const vendor = vendorsData.vendors.find((entry) => entry.userId === req.user.id);
-    if (!vendor) {
+    const farmer = await fetchFarmerByUserId(req.user.id);
+    if (!farmer) {
       return res.status(400).json({ error: 'Vendor profile is required.' });
     }
 
-    let image = null;
-    if (imageUrl) {
-      image = {
-        url: imageUrl,
-        alt: `${name} photo`,
-        source: 'upload',
-      };
-    } else {
-      image = await getProductImage(name);
-    }
-
-    const product = {
-      id: crypto.randomUUID(),
-      vendorId: vendor.id,
-      name,
-      category: category || 'fruits_and_vegetables',
-      type: type || '',
-      unit: unit || 'unit',
-      price: priceValue,
-      rating: Number(ratingValue.toFixed(1)),
-      available: available !== false,
-      isBio: Boolean(isBio),
-      image,
-      createdAt: new Date().toISOString(),
+    const payload = {
+      farmer_id: farmer.id,
+      'product name': normalizeText(name, 180),
+      category: normalizeText(category, 80) || 'fruits_and_vegetables',
+      type: normalizeText(type, 80),
+      Unit: normalizeText(unit, 40) || 'unit',
+      Price: Number(priceValue.toFixed(2)),
+      available: toIntFlag(available !== false),
+      'bio check': toIntFlag(Boolean(isBio)),
+      'photo url': typeof imageUrl === 'string' && imageUrl.trim() ? imageUrl.trim() : null,
     };
 
-    await updateJson(paths.products, { products: [] }, (data) => {
-      const products = Array.isArray(data.products) ? data.products : [];
-      products.push(product);
-      return { data: { products }, result: product };
-    });
+    const { data: insertedProduct, error: insertError } = await supabase
+      .from(TABLES.products)
+      .insert(payload)
+      .select(PRODUCT_COLUMNS)
+      .single();
 
-    return res.status(201).json({ product });
+    if (insertError) {
+      return res.status(500).json({ error: insertError.message });
+    }
+
+    return res.status(201).json({ product: mapProductToApi(insertedProduct) });
   } catch (error) {
     return next(error);
   }
@@ -469,29 +506,28 @@ router.delete('/products/:productId', requireVendor, async (req, res, next) => {
       return res.status(400).json({ error: 'productId is required.' });
     }
 
-    const vendorsData = await readJson(paths.vendors, { vendors: [] });
-    const vendor = vendorsData.vendors.find((entry) => entry.userId === req.user.id);
-    if (!vendor) {
+    const farmer = await fetchFarmerByUserId(req.user.id);
+    if (!farmer) {
       return res.status(400).json({ error: 'Vendor profile is required.' });
     }
 
-    const deletedProduct = await updateJson(paths.products, { products: [] }, (data) => {
-      const products = Array.isArray(data.products) ? data.products : [];
-      const index = products.findIndex(
-        (product) => product.id === productId && product.vendorId === vendor.id,
-      );
-      if (index === -1) {
-        return { data, result: null };
-      }
-      const [removed] = products.splice(index, 1);
-      return { data: { products }, result: removed };
-    });
+    const { data: deletedRows, error: deleteError } = await supabase
+      .from(TABLES.products)
+      .delete()
+      .eq('id', productId)
+      .eq('farmer_id', farmer.id)
+      .select(PRODUCT_COLUMNS);
 
+    if (deleteError) {
+      return res.status(500).json({ error: deleteError.message });
+    }
+
+    const deletedProduct = Array.isArray(deletedRows) ? deletedRows[0] : null;
     if (!deletedProduct) {
       return res.status(404).json({ error: 'Product not found.' });
     }
 
-    return res.json({ product: deletedProduct });
+    return res.json({ product: mapProductToApi(deletedProduct) });
   } catch (error) {
     return next(error);
   }

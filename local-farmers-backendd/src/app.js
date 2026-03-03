@@ -14,7 +14,7 @@ const profileRouter = require('./routes/profile');
 const marketsRouter = require('./routes/markets');
 const externalRouter = require('./routes/external');
 const productsRouter = require('./routes/products');
-const { bootstrapData } = require('./lib/bootstrap');
+const { purgeLegacyState } = require('./lib/legacyCleanup');
 
 const app = express();
 
@@ -50,8 +50,8 @@ app.use(
 );
 app.use(express.static(path.join(__dirname, '../public')));
 
-bootstrapData().catch((error) => {
-  console.error('Failed to initialize data files', error);
+purgeLegacyState().catch((error) => {
+  console.error('Failed to purge legacy local state', error);
 });
 
 app.get('/', (req, res) => {

@@ -1,56 +1,42 @@
-const { updateJson } = require('./fileStore');
+const inMemoryCache = new Map();
 
-const normalizeEntries = (data) => {
-  if (!data || !Array.isArray(data.entries)) {
-    return [];
+const resolveStore = (cachePath) => {
+  const key = cachePath || '__default__';
+  let store = inMemoryCache.get(key);
+  if (!store) {
+    store = new Map();
+    inMemoryCache.set(key, store);
   }
-  return data.entries;
+  return store;
 };
 
-const pruneExpired = (entries, now) =>
-  entries.filter((entry) => {
-    if (!entry || !entry.expiresAt) {
-      return false;
+const pruneStore = (store, now) => {
+  for (const [key, entry] of store.entries()) {
+    if (!entry || typeof entry.expiresAt !== 'number' || entry.expiresAt <= now) {
+      store.delete(key);
     }
-    const expiresAt = new Date(entry.expiresAt).getTime();
-    if (Number.isNaN(expiresAt)) {
-      return false;
-    }
-    return expiresAt > now;
+  }
+};
+
+const getCacheEntry = async (cachePath, key) => {
+  const store = resolveStore(cachePath);
+  const now = Date.now();
+  pruneStore(store, now);
+
+  const entry = store.get(key);
+  return entry ? entry.value : null;
+};
+
+const setCacheEntry = async (cachePath, key, value, ttlMs) => {
+  const store = resolveStore(cachePath);
+  const now = Date.now();
+  const safeTtl = Number.isFinite(ttlMs) && ttlMs > 0 ? ttlMs : 0;
+  store.set(key, {
+    value,
+    expiresAt: now + safeTtl,
   });
-
-const getCacheEntry = async (cachePath, key) =>
-  updateJson(cachePath, { entries: [] }, (data) => {
-    const now = Date.now();
-    const entries = normalizeEntries(data);
-    const activeEntries = pruneExpired(entries, now);
-    const hit = activeEntries.find((entry) => entry.key === key);
-
-    return {
-      data: { entries: activeEntries },
-      result: hit ? hit.value : null,
-    };
-  });
-
-const setCacheEntry = async (cachePath, key, value, ttlMs) =>
-  updateJson(cachePath, { entries: [] }, (data) => {
-    const now = Date.now();
-    const entries = normalizeEntries(data);
-    const activeEntries = pruneExpired(entries, now).filter(
-      (entry) => entry.key !== key,
-    );
-
-    activeEntries.push({
-      key,
-      value,
-      expiresAt: new Date(now + ttlMs).toISOString(),
-    });
-
-    return {
-      data: { entries: activeEntries },
-      result: value,
-    };
-  });
+  return value;
+};
 
 const getOrSetCache = async (cachePath, key, ttlMs, fetcher) => {
   const cached = await getCacheEntry(cachePath, key);
@@ -67,6 +53,7 @@ const getOrSetCache = async (cachePath, key, ttlMs, fetcher) => {
 };
 
 module.exports = {
+  inMemoryCache,
   getCacheEntry,
   setCacheEntry,
   getOrSetCache,

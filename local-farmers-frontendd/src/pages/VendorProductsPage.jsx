@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import {
@@ -7,6 +7,7 @@ import {
   resolveImageUrl,
   resolveUploadUrl,
 } from '../lib/api.js';
+import { supabase } from '../lib/supabase.js';
 import { useAuth } from '../lib/auth.jsx';
 
 export default function VendorProductsPage() {
@@ -17,39 +18,74 @@ export default function VendorProductsPage() {
     message: '',
   });
 
+  const loadProducts = useCallback(async () => {
+    try {
+      const response = await apiFetch('/api/vendor/products', { method: 'GET' });
+      const data = await response.json();
+      setProducts(data.products || []);
+      setStatus({ state: 'success', message: '' });
+    } catch (_error) {
+      setStatus({
+        state: 'error',
+        message: 'Unable to load products.',
+      });
+    }
+  }, []);
+
+  useEffect(() => {
+    if (authStatus !== 'authenticated' || !user || user.role !== 'vendor') {
+      return;
+    }
+
+    loadProducts().catch(() => {});
+  }, [authStatus, user, loadProducts]);
+
   useEffect(() => {
     if (authStatus !== 'authenticated' || !user || user.role !== 'vendor') {
       return;
     }
 
     let active = true;
+    let channel = null;
 
-    const loadProducts = async () => {
+    const subscribeToProducts = async () => {
       try {
-        const response = await apiFetch('/api/vendor/products', { method: 'GET' });
+        const response = await apiFetch('/api/vendor/profile', { method: 'GET' });
         const data = await response.json();
-        if (!active) {
+        const vendorId = data?.vendor?.id;
+        if (!active || !vendorId) {
           return;
         }
-        setProducts(data.products || []);
-        setStatus({ state: 'success', message: '' });
-      } catch (error) {
-        if (!active) {
-          return;
-        }
-        setStatus({
-          state: 'error',
-          message: 'Unable to load products.',
-        });
+
+        channel = supabase
+          .channel(`vendor-products-${vendorId}`)
+          .on(
+            'postgres_changes',
+            {
+              event: '*',
+              schema: 'public',
+              table: 'products',
+              filter: `farmer_id=eq.${vendorId}`,
+            },
+            () => {
+              loadProducts().catch(() => {});
+            },
+          )
+          .subscribe();
+      } catch (_error) {
+        // Ignore realtime setup failures and keep manual refresh behavior.
       }
     };
 
-    loadProducts();
+    subscribeToProducts().catch(() => {});
 
     return () => {
       active = false;
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
-  }, [authStatus, user]);
+  }, [authStatus, user, loadProducts]);
 
   const handleDeleteProduct = async (productId) => {
     if (!productId) {

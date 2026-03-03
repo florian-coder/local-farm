@@ -1,13 +1,11 @@
 const crypto = require('crypto');
 const { promisify } = require('util');
 
-const { updateJson } = require('./fileStore');
-const { paths } = require('./dataPaths');
-
 const scryptAsync = promisify(crypto.scrypt);
 
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
 const SESSION_COOKIE_NAME = 'lf_session';
+const SESSION_SECRET = process.env.SESSION_SECRET || 'local-farmers-dev-session-secret';
 
 const hashPassword = async (password) => {
   const salt = crypto.randomBytes(16).toString('hex');
@@ -23,6 +21,7 @@ const verifyPassword = async (password, storedHash) => {
   if (!salt || !key) {
     return false;
   }
+
   const derivedKey = await scryptAsync(password, salt, 64);
   const keyBuffer = Buffer.from(key, 'hex');
   if (keyBuffer.length !== derivedKey.length) {
@@ -31,72 +30,71 @@ const verifyPassword = async (password, storedHash) => {
   return crypto.timingSafeEqual(keyBuffer, derivedKey);
 };
 
+const base64UrlEncode = (value) =>
+  Buffer.from(value, 'utf8').toString('base64url');
+const base64UrlDecode = (value) =>
+  Buffer.from(value, 'base64url').toString('utf8');
+
+const signValue = (value) =>
+  crypto.createHmac('sha256', SESSION_SECRET).update(value).digest('base64url');
+
 const createSession = async (user) => {
-  const token = crypto.randomBytes(32).toString('hex');
-  const now = new Date();
-  const session = {
-    id: crypto.randomUUID(),
-    token,
-    userId: user.id,
+  const now = Date.now();
+  const payload = {
+    userId: String(user.id),
     role: user.role,
-    createdAt: now.toISOString(),
-    expiresAt: new Date(now.getTime() + SESSION_TTL_MS).toISOString(),
+    exp: now + SESSION_TTL_MS,
   };
 
-  await updateJson(paths.sessions, { sessions: [] }, (data) => {
-    const sessions = Array.isArray(data.sessions) ? data.sessions : [];
-    const activeSessions = sessions.filter((entry) => {
-      const expiresAt = new Date(entry.expiresAt).getTime();
-      return Number.isFinite(expiresAt) && expiresAt > Date.now();
-    });
-
-    activeSessions.push(session);
-
-    return {
-      data: { sessions: activeSessions },
-      result: session,
-    };
-  });
-
-  return session;
+  const payloadSegment = base64UrlEncode(JSON.stringify(payload));
+  const signature = signValue(payloadSegment);
+  return {
+    token: `${payloadSegment}.${signature}`,
+    expiresAt: new Date(payload.exp).toISOString(),
+  };
 };
 
 const getSession = async (token) => {
-  if (!token) {
+  if (!token || typeof token !== 'string' || !token.includes('.')) {
     return null;
   }
 
-  return updateJson(paths.sessions, { sessions: [] }, (data) => {
-    const sessions = Array.isArray(data.sessions) ? data.sessions : [];
-    const now = Date.now();
-    const activeSessions = sessions.filter((entry) => {
-      const expiresAt = new Date(entry.expiresAt).getTime();
-      return Number.isFinite(expiresAt) && expiresAt > now;
-    });
-
-    const session = activeSessions.find((entry) => entry.token === token) || null;
-
-    return {
-      data: { sessions: activeSessions },
-      result: session,
-    };
-  });
-};
-
-const revokeSession = async (token) => {
-  if (!token) {
+  const [payloadSegment, signature] = token.split('.');
+  if (!payloadSegment || !signature) {
     return null;
   }
 
-  return updateJson(paths.sessions, { sessions: [] }, (data) => {
-    const sessions = Array.isArray(data.sessions) ? data.sessions : [];
-    const nextSessions = sessions.filter((entry) => entry.token !== token);
+  const expectedSignature = signValue(payloadSegment);
+  const expectedBuffer = Buffer.from(expectedSignature);
+  const signatureBuffer = Buffer.from(signature);
+  if (
+    expectedBuffer.length !== signatureBuffer.length ||
+    !crypto.timingSafeEqual(expectedBuffer, signatureBuffer)
+  ) {
+    return null;
+  }
+
+  try {
+    const payloadRaw = base64UrlDecode(payloadSegment);
+    const payload = JSON.parse(payloadRaw);
+    if (!payload?.userId || !payload?.exp) {
+      return null;
+    }
+    if (Date.now() >= Number(payload.exp)) {
+      return null;
+    }
+
     return {
-      data: { sessions: nextSessions },
-      result: null,
+      userId: String(payload.userId),
+      role: payload.role || null,
+      expiresAt: new Date(Number(payload.exp)).toISOString(),
     };
-  });
+  } catch (_error) {
+    return null;
+  }
 };
+
+const revokeSession = async () => null;
 
 module.exports = {
   SESSION_TTL_MS,

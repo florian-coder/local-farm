@@ -1,6 +1,6 @@
 const { getSession, SESSION_COOKIE_NAME } = require('../lib/auth');
-const { readJson } = require('../lib/fileStore');
-const { paths } = require('../lib/dataPaths');
+const { supabase, TABLES } = require('../lib/supabase');
+const { mapDbUserToApi } = require('../lib/domain');
 
 const getUserFromRequest = async (req) => {
   const token = req.cookies?.[SESSION_COOKIE_NAME];
@@ -13,8 +13,21 @@ const getUserFromRequest = async (req) => {
     return null;
   }
 
-  const usersData = await readJson(paths.users, { users: [] });
-  return usersData.users.find((user) => user.id === session.userId) || null;
+  const { data: user, error } = await supabase
+    .from(TABLES.users)
+    .select('id, username, email, user_type')
+    .eq('id', session.userId)
+    .maybeSingle();
+
+  if (error || !user) {
+    return null;
+  }
+
+  const mapped = mapDbUserToApi(user);
+  return {
+    ...mapped,
+    email: user.email || '',
+  };
 };
 
 const requireAuth = async (req, res, next) => {

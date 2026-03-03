@@ -1,8 +1,8 @@
 const { getCacheEntry, setCacheEntry } = require('./cacheStore');
-const { paths } = require('./dataPaths');
 const { fetchPexels } = require('./external/pexels');
 
 const PRODUCT_IMAGE_TTL = 1000 * 60 * 60 * 24 * 7;
+const PEXELS_CACHE_SCOPE = 'pexels-product-images';
 
 const normalizeName = (value) =>
   value
@@ -55,14 +55,14 @@ const resolveQueryPlan = (name) => {
 
 const getCachedPexels = async (query, locale) => {
   const key = `pexels:product:${locale || 'default'}:${query}`;
-  const cached = await getCacheEntry(paths.cache.pexels, key);
+  const cached = await getCacheEntry(PEXELS_CACHE_SCOPE, key);
   if (cached?.photos?.length) {
     return cached.photos[0];
   }
 
   const fresh = await fetchPexels({ query, perPage: 1, locale });
   if (fresh?.photos?.length) {
-    await setCacheEntry(paths.cache.pexels, key, fresh, PRODUCT_IMAGE_TTL);
+    await setCacheEntry(PEXELS_CACHE_SCOPE, key, fresh, PRODUCT_IMAGE_TTL);
     return fresh.photos[0];
   }
 

@@ -1,6 +1,5 @@
 const express = require('express');
 
-const { paths } = require('../lib/dataPaths');
 const { getCacheEntry, getOrSetCache, setCacheEntry } = require('../lib/cacheStore');
 const { fetchSoilGrids } = require('../lib/external/soilgrids');
 const { fetchUsdaMarkets } = require('../lib/external/usdaLocalFood');
@@ -10,6 +9,13 @@ const { fetchPexels } = require('../lib/external/pexels');
 const { getProductImage } = require('../lib/productMedia');
 
 const router = express.Router();
+const CACHE_SCOPES = {
+  soil: 'external-soil',
+  usdaMarkets: 'external-usda-markets',
+  usdaNews: 'external-usda-news',
+  faostat: 'external-faostat',
+  pexels: 'external-pexels',
+};
 
 const toNumber = (value) => {
   const parsed = Number(value);
@@ -26,7 +32,7 @@ router.get('/soilgrids', async (req, res, next) => {
 
     const key = `soil:${lat},${lng}`;
     const { value } = await getOrSetCache(
-      paths.cache.soil,
+      CACHE_SCOPES.soil,
       key,
       1000 * 60 * 60 * 24 * 7,
       () => fetchSoilGrids(lat, lng),
@@ -56,7 +62,7 @@ router.get('/usda-markets', async (req, res, next) => {
     const key = resolvedZip ? `zip:${resolvedZip}` : `coords:${lat},${lng}`;
 
     const { value } = await getOrSetCache(
-      paths.cache.usdaMarkets,
+      CACHE_SCOPES.usdaMarkets,
       key,
       1000 * 60 * 60 * 24,
       () =>
@@ -82,7 +88,7 @@ router.get('/usda-news', async (req, res, next) => {
 
     const key = `commodity:${commodity}`;
     const { value } = await getOrSetCache(
-      paths.cache.usdaNews,
+      CACHE_SCOPES.usdaNews,
       key,
       1000 * 60 * 60 * 6,
       () => fetchUsdaMarketNews({ commodity }),
@@ -104,7 +110,7 @@ router.get('/faostat', async (req, res, next) => {
 
     const key = `item:${item}|country:${country}`;
     const { value } = await getOrSetCache(
-      paths.cache.faostat,
+      CACHE_SCOPES.faostat,
       key,
       1000 * 60 * 60 * 24 * 30,
       () => fetchFaostat({ item, country }),
@@ -123,7 +129,7 @@ router.get('/pexels', async (req, res, next) => {
     const safePerPage = Number.isFinite(perPage) && perPage > 0 ? perPage : 1;
 
     const key = `pexels:${query}:${safePerPage}`;
-    const cached = await getCacheEntry(paths.cache.pexels, key);
+    const cached = await getCacheEntry(CACHE_SCOPES.pexels, key);
     if (cached?.photos?.length) {
       return res.json(cached);
     }
@@ -131,7 +137,7 @@ router.get('/pexels', async (req, res, next) => {
     const fresh = await fetchPexels({ query, perPage: safePerPage, locale: 'ro-RO' });
     if (fresh?.photos?.length) {
       await setCacheEntry(
-        paths.cache.pexels,
+        CACHE_SCOPES.pexels,
         key,
         fresh,
         1000 * 60 * 60 * 24,

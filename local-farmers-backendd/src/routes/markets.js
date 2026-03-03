@@ -1,17 +1,16 @@
 const express = require('express');
 
-const { paths } = require('../lib/dataPaths');
-const { readJson, updateJson } = require('../lib/fileStore');
 const { getOrSetCache } = require('../lib/cacheStore');
 const { fetchSoilGrids } = require('../lib/external/soilgrids');
 const { fetchUsdaMarketNews } = require('../lib/external/usdaMyMarketNews');
 const { fetchFaostat } = require('../lib/external/faostat');
 const { getProductImage } = require('../lib/productMedia');
+const { supabase, TABLES } = require('../lib/supabase');
+const { DEFAULT_MARKETS, mapProductToApi } = require('../lib/domain');
 
 const router = express.Router();
 
 const TOP_COMMODITIES = ['tomatoes', 'potatoes', 'apples'];
-const MAX_PRODUCT_DISTANCE_KM = 60;
 const MARKET_PRODUCTS_LIMIT = 6;
 const NEWS_IMAGE_QUERY = {
   tomatoes: 'tomatoes',
@@ -19,244 +18,184 @@ const NEWS_IMAGE_QUERY = {
   apples: 'apples',
 };
 
+const PRODUCT_COLUMNS = [
+  'id',
+  'farmer_id',
+  '"product name"',
+  'category',
+  'type',
+  'Unit',
+  'Price',
+  '"photo url"',
+  '"bio check"',
+  'available',
+].join(', ');
+
+const FARMER_COLUMNS = [
+  'id',
+  '"farm name"',
+  '"display name"',
+  'city',
+  'county',
+].join(', ');
+
 const isNumber = (value) => typeof value === 'number' && Number.isFinite(value);
 
-const isLocalUpload = (image) => {
-  const url = image?.url;
-  return (
-    typeof url === 'string' &&
-    (url.startsWith('/uploads') ||
-      url.startsWith('uploads/') ||
-      url.includes('/uploads/'))
+const sortProductsByNewest = (products) =>
+  products
+    .slice()
+    .sort((a, b) => Number(b.id || 0) - Number(a.id || 0));
+
+const loadProducts = async (category) => {
+  let query = supabase.from(TABLES.products).select(PRODUCT_COLUMNS);
+  if (category) {
+    query = query.eq('category', category);
+  }
+
+  const [productsResult, farmersResult] = await Promise.all([
+    query,
+    supabase.from(TABLES.farmers).select(FARMER_COLUMNS),
+  ]);
+
+  if (productsResult.error) {
+    throw new Error(productsResult.error.message || 'Unable to load products.');
+  }
+  if (farmersResult.error) {
+    throw new Error(farmersResult.error.message || 'Unable to load farmers.');
+  }
+
+  const farmersById = new Map(
+    (farmersResult.data || []).map((farmer) => [
+      String(farmer.id),
+      {
+        id: String(farmer.id),
+        farmName: farmer['farm name'] || '',
+        displayName: farmer['display name'] || '',
+        city: farmer.city || '',
+        county: farmer.county || '',
+      },
+    ]),
+  );
+
+  return Promise.all(
+    (productsResult.data || []).map(async (product) => {
+      const vendor = farmersById.get(String(product.farmer_id)) || null;
+      const mapped = mapProductToApi(product, vendor);
+      if (!mapped.image?.url) {
+        const fallback = await getProductImage(mapped.name);
+        if (fallback?.url) {
+          return {
+            ...mapped,
+            image: fallback,
+          };
+        }
+      }
+      return mapped;
+    }),
   );
 };
 
-const toAbsoluteUploadUrl = (req, url) => {
-  if (typeof url !== 'string') {
-    return url;
-  }
-  if (!url.startsWith('/uploads') && !url.startsWith('uploads/')) {
-    return url;
-  }
-  const base = `${req.protocol}://${req.get('host')}`;
-  const normalized = url.startsWith('/') ? url : `/${url}`;
-  return `${base}${normalized}`;
+const loadMarketNews = async () => {
+  const marketNews = await Promise.all(
+    TOP_COMMODITIES.map(async (commodity) => {
+      const key = `commodity:${commodity}`;
+      const { value } = await getOrSetCache(
+        'markets-usda-news',
+        key,
+        1000 * 60 * 60 * 6,
+        () => fetchUsdaMarketNews({ commodity }),
+      );
+      return value;
+    }),
+  );
+
+  return Promise.all(
+    marketNews.map(async (newsItem) => {
+      if (!newsItem) {
+        return null;
+      }
+      const commodityName =
+        typeof newsItem.commodity === 'string'
+          ? newsItem.commodity.toLowerCase()
+          : '';
+      const query =
+        NEWS_IMAGE_QUERY[commodityName] || newsItem.commodity || 'fresh vegetables';
+      const image = await getProductImage(query);
+      return { ...newsItem, image };
+    }),
+  );
 };
 
-const normalizeUploadImage = (req, image) => {
-  if (!image?.url || !isLocalUpload(image)) {
-    return image;
+const loadGlobalStats = async () => {
+  const faostatKey = 'item:Tomatoes|country:Romania';
+  const { value: globalStats } = await getOrSetCache(
+    'markets-faostat',
+    faostatKey,
+    1000 * 60 * 60 * 24 * 30,
+    () => fetchFaostat({ item: 'Tomatoes', country: 'Romania' }),
+  );
+  return globalStats;
+};
+
+const buildMarketResponse = async (category) => {
+  const [products, marketNewsWithImages, globalStats] = await Promise.all([
+    loadProducts(category),
+    loadMarketNews(),
+    loadGlobalStats(),
+  ]);
+
+  const sortedProducts = sortProductsByNewest(products);
+  const markets = await Promise.all(
+    DEFAULT_MARKETS.map(async (market) => {
+      let soil = null;
+      if (isNumber(market.lat) && isNumber(market.lng)) {
+        const soilKey = `soil:${market.lat},${market.lng}`;
+        const soilResult = await getOrSetCache(
+          'markets-soil',
+          soilKey,
+          1000 * 60 * 60 * 24 * 7,
+          () => fetchSoilGrids(market.lat, market.lng),
+        );
+        soil = soilResult.value;
+      }
+
+      return {
+        id: market.id,
+        name: market.name,
+        openStands: market.openStands,
+        activeGrowers: market.activeGrowers,
+        pickupPoints: market.pickupPoints,
+        soil: soil
+          ? {
+              ph: soil.ph,
+              organicCarbon: soil.organicCarbon,
+              qualityScore: soil.qualityScore,
+            }
+          : null,
+        marketNews: marketNewsWithImages.filter(Boolean).slice(0, 3),
+        globalStats,
+        products: sortedProducts.slice(0, MARKET_PRODUCTS_LIMIT),
+      };
+    }),
+  );
+
+  return markets;
+};
+
+router.get('/', async (_req, res, next) => {
+  try {
+    const markets = await buildMarketResponse(null);
+    return res.json({ markets });
+  } catch (error) {
+    return next(error);
   }
-  const normalizedUrl = toAbsoluteUploadUrl(req, image.url);
-  return {
-    ...image,
-    url: normalizedUrl,
-    photoUrl: image.photoUrl
-      ? toAbsoluteUploadUrl(req, image.photoUrl)
-      : image.photoUrl,
-    source: image.source || 'upload',
-  };
-};
-
-const shouldFetchStockImage = (image) => {
-  if (!image?.url) {
-    return true;
-  }
-  if (image?.source === 'upload' || isLocalUpload(image)) {
-    return false;
-  }
-  return !image?.photoUrl || !image?.photographer;
-};
-
-const toTimestamp = (value) => {
-  const time = Date.parse(value);
-  return Number.isFinite(time) ? time : 0;
-};
-
-const sortByNewest = (items) =>
-  [...items].sort((a, b) => toTimestamp(b.createdAt) - toTimestamp(a.createdAt));
-
-const toRadians = (value) => (value * Math.PI) / 180;
-
-const distanceKm = (lat1, lng1, lat2, lng2) => {
-  const earthRadiusKm = 6371;
-  const latDelta = toRadians(lat2 - lat1);
-  const lngDelta = toRadians(lng2 - lng1);
-  const a =
-    Math.sin(latDelta / 2) * Math.sin(latDelta / 2) +
-    Math.cos(toRadians(lat1)) *
-      Math.cos(toRadians(lat2)) *
-      Math.sin(lngDelta / 2) *
-      Math.sin(lngDelta / 2);
-  const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-  return earthRadiusKm * c;
-};
+});
 
 router.get('/:category', async (req, res, next) => {
   try {
     const { category } = req.params;
-    const marketsData = await readJson(paths.markets, { markets: [] });
-    const markets = Array.isArray(marketsData.markets) ? marketsData.markets : [];
-    const vendorsData = await readJson(paths.vendors, { vendors: [] });
-    const productsData = await readJson(paths.products, { products: [] });
-
-    const vendors = Array.isArray(vendorsData.vendors) ? vendorsData.vendors : [];
-    const products = Array.isArray(productsData.products)
-      ? productsData.products.filter(p => p.category === category)
-      : [];
-    const vendorsById = new Map(vendors.map((vendor) => [vendor.id, vendor]));
-    const productsWithVendors = products.map((product) => {
-      const vendor = vendorsById.get(product.vendorId) || null;
-      return {
-        id: product.id,
-        name: product.name,
-        category: product.category,
-        type: product.type ?? '',
-        unit: product.unit,
-        price: product.price ?? 0,
-        available: product.available,
-        rating: product.rating ?? null,
-        isBio: product.isBio ?? false,
-        image: product.image ?? null,
-        createdAt: product.createdAt ?? null,
-        vendor: vendor
-          ? {
-              id: vendor.id,
-              farmName: vendor.farmName,
-              displayName: vendor.displayName,
-              lat: vendor.lat,
-              lng: vendor.lng,
-            }
-          : null,
-        };
-      });
-
-    const imageUpdates = new Map();
-    const hydratedProducts = await Promise.all(
-      productsWithVendors.map(async (product) => {
-        if (!shouldFetchStockImage(product.image)) {
-          return product;
-        }
-        const image = await getProductImage(product.name);
-        if (image) {
-          imageUpdates.set(product.id, image);
-          return { ...product, image };
-        }
-        return product;
-      }),
-    );
-
-    if (imageUpdates.size > 0) {
-      await updateJson(paths.products, { products: [] }, (data) => {
-        const allProducts = Array.isArray(data.products) ? data.products : [];
-        const nextProducts = allProducts.map((entry) =>
-          imageUpdates.has(entry.id)
-            ? { ...entry, image: imageUpdates.get(entry.id) }
-            : entry,
-        );
-        return { data: { products: nextProducts }, result: null };
-      });
-    }
-
-    const marketNews = await Promise.all(
-      TOP_COMMODITIES.map(async (commodity) => {
-        const key = `commodity:${commodity}`;
-        const { value } = await getOrSetCache(
-          paths.cache.usdaNews,
-          key,
-          1000 * 60 * 60 * 6,
-          () => fetchUsdaMarketNews({ commodity }),
-        );
-        return value;
-      }),
-    );
-
-    const marketNewsWithImages = await Promise.all(
-      marketNews.map(async (newsItem) => {
-        if (!newsItem) {
-          return null;
-        }
-        const commodityName =
-          typeof newsItem.commodity === 'string'
-            ? newsItem.commodity.toLowerCase()
-            : '';
-        const query =
-          NEWS_IMAGE_QUERY[commodityName] ||
-          newsItem.commodity ||
-          'legume proaspete';
-        const image = await getProductImage(query);
-        return { ...newsItem, image };
-      }),
-    );
-
-    const faostatKey = 'item:Tomatoes|country:Romania';
-    const { value: globalStats } = await getOrSetCache(
-      paths.cache.faostat,
-      faostatKey,
-      1000 * 60 * 60 * 24 * 30,
-      () => fetchFaostat({ item: 'Tomatoes', country: 'Romania' }),
-    );
-
-    const enriched = await Promise.all(
-      markets.map(async (market) => {
-        let soil = null;
-        if (typeof market.lat === 'number' && typeof market.lng === 'number') {
-          const soilKey = `soil:${market.lat},${market.lng}`;
-          const soilResult = await getOrSetCache(
-            paths.cache.soil,
-            soilKey,
-            1000 * 60 * 60 * 24 * 7,
-            () => fetchSoilGrids(market.lat, market.lng),
-          );
-          soil = soilResult.value;
-        }
-
-        const marketHasCoords = isNumber(market.lat) && isNumber(market.lng);
-        const locationProducts = hydratedProducts.filter((product) => {
-          if (!marketHasCoords) {
-            return true;
-          }
-          const vendorLat = product.vendor?.lat;
-          const vendorLng = product.vendor?.lng;
-          if (!isNumber(vendorLat) || !isNumber(vendorLng)) {
-            return true;
-          }
-          return (
-            distanceKm(market.lat, market.lng, vendorLat, vendorLng) <=
-            MAX_PRODUCT_DISTANCE_KM
-          );
-        });
-        const sortedLocationProducts = sortByNewest(locationProducts);
-        const sortedProducts = sortByNewest(hydratedProducts);
-        const marketProducts =
-          sortedLocationProducts.length > 0 ? sortedLocationProducts : sortedProducts;
-
-        return {
-          id: market.id,
-          name: market.name,
-          openStands: market.openStands,
-          activeGrowers: market.activeGrowers,
-          pickupPoints: market.pickupPoints,
-          soil: soil
-            ? {
-                ph: soil.ph,
-                organicCarbon: soil.organicCarbon,
-                qualityScore: soil.qualityScore,
-              }
-            : null,
-          marketNews: marketNewsWithImages.filter(Boolean).slice(0, 3),
-          globalStats,
-          products: marketProducts
-            .slice(0, MARKET_PRODUCTS_LIMIT)
-            .map((product) => ({
-              ...product,
-              image: normalizeUploadImage(req, product.image),
-            })),
-        };
-      }),
-    );
-
-    return res.json({ markets: enriched });
+    const markets = await buildMarketResponse(category);
+    return res.json({ markets });
   } catch (error) {
     return next(error);
   }

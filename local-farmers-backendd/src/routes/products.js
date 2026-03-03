@@ -1,32 +1,61 @@
 const express = require('express');
 
-const { paths } = require('../lib/dataPaths');
-const { readJson } = require('../lib/fileStore');
+const { supabase, TABLES } = require('../lib/supabase');
+const { mapProductToApi } = require('../lib/domain');
 
 const router = express.Router();
 
-router.get('/', async (req, res, next) => {
+const PRODUCT_COLUMNS = [
+  'id',
+  'farmer_id',
+  '"product name"',
+  'category',
+  'type',
+  'Unit',
+  'Price',
+  '"photo url"',
+  '"bio check"',
+  'available',
+].join(', ');
+
+const FARMER_COLUMNS = [
+  'id',
+  '"farm name"',
+  '"display name"',
+  'city',
+  'county',
+].join(', ');
+
+router.get('/', async (_req, res, next) => {
   try {
-    const productsData = await readJson(paths.products, { products: [] });
-    const vendorsData = await readJson(paths.vendors, { vendors: [] });
-    const vendorsById = new Map(
-      vendorsData.vendors.map((vendor) => [vendor.id, vendor]),
+    const [productsResult, farmersResult] = await Promise.all([
+      supabase.from(TABLES.products).select(PRODUCT_COLUMNS),
+      supabase.from(TABLES.farmers).select(FARMER_COLUMNS),
+    ]);
+
+    if (productsResult.error) {
+      return res.status(500).json({ error: productsResult.error.message });
+    }
+    if (farmersResult.error) {
+      return res.status(500).json({ error: farmersResult.error.message });
+    }
+
+    const farmersById = new Map(
+      (farmersResult.data || []).map((farmer) => [
+        String(farmer.id),
+        {
+          id: String(farmer.id),
+          farmName: farmer['farm name'] || '',
+          displayName: farmer['display name'] || '',
+          city: farmer.city || '',
+          county: farmer.county || '',
+        },
+      ]),
     );
 
-    const products = productsData.products.map((product) => {
-      const vendor = vendorsById.get(product.vendorId);
-      return {
-        ...product,
-        vendor: vendor
-          ? {
-              id: vendor.id,
-              farmName: vendor.farmName,
-              displayName: vendor.displayName,
-              lat: vendor.lat,
-              lng: vendor.lng,
-            }
-          : null,
-      };
+    const products = (productsResult.data || []).map((product) => {
+      const vendor = farmersById.get(String(product.farmer_id)) || null;
+      return mapProductToApi(product, vendor);
     });
 
     return res.json({ products });

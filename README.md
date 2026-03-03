@@ -5,7 +5,7 @@ Monorepo with a Node/Express backend and a React/Vite frontend.
 ## Project Structure
 - `local-farmers-backendd/` - Express API (`src/`, `tests/`)
 - `local-farmers-frontendd/` - React UI (`src/`, `src/__tests__/`, `src/styles/`)
-- `data/` - file-based JSON storage used by the API (users, vendors, products, markets, cache)
+- `data/` - legacy JSON storage folder kept only for migration cleanup compatibility
 
 ## Quick Start
 Backend:
@@ -44,5 +44,6 @@ npm run lint
 npm run format
 ```
 
-## File-Based Storage Notes
-This project persists data in JSON files under `data/`. It works well locally and on hosts with persistent disks (VPS, Docker, Render with disk). On serverless platforms, file writes can be temporary or blocked.
+## Storage Notes
+Core application data is loaded from Supabase tables and Supabase Storage buckets.
+Legacy JSON files under `data/` are purged on API startup to prevent mixed-state conflicts.

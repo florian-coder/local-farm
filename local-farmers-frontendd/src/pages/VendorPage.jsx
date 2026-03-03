@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 
 import { apiFetch, getApiBase, resolveImageUrl } from '../lib/api.js';
+import { supabase } from '../lib/supabase.js';
 import { useAuth } from '../lib/auth.jsx';
 
 const MAX_FARM_IMAGES = 10;
@@ -159,6 +160,43 @@ export default function VendorPage() {
     setPhotoPreview(previewUrl);
     return () => URL.revokeObjectURL(previewUrl);
   }, [productForm.photo]);
+
+  useEffect(() => {
+    if (
+      authStatus !== 'authenticated' ||
+      !user ||
+      user.role !== 'vendor' ||
+      !profile.id
+    ) {
+      return;
+    }
+
+    const channel = supabase
+      .channel(`vendor-dashboard-products-${profile.id}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'products',
+          filter: `farmer_id=eq.${profile.id}`,
+        },
+        async () => {
+          try {
+            const response = await apiFetch('/api/vendor/products', { method: 'GET' });
+            const data = await response.json();
+            setProducts(data.products || []);
+          } catch (_error) {
+            // Keep current list if realtime sync fails.
+          }
+        },
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [authStatus, user, profile.id]);
 
   const handleProfileChange = (event) => {
     const { name, value } = event.target;

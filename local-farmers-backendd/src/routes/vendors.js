@@ -1,144 +1,105 @@
 const express = require('express');
 
-const { paths } = require('../lib/dataPaths');
-const { readJson } = require('../lib/fileStore');
+const { supabase, TABLES } = require('../lib/supabase');
+const { mapFarmerToVendor, mapProductToApi } = require('../lib/domain');
 
 const router = express.Router();
 
-const isLocalUpload = (image) => {
-  const url = image?.url;
-  return (
-    typeof url === 'string' &&
-    (url.startsWith('/uploads') ||
-      url.startsWith('uploads/') ||
-      url.includes('/uploads/'))
-  );
-};
+const FARMER_COLUMNS = [
+  'id',
+  '"farm name"',
+  '"display name"',
+  '"street address"',
+  '"street number"',
+  'city',
+  'county',
+  '"phone number"',
+  'email',
+  '"organic operator certificate"',
+  '"delivery radius"',
+  'bio',
+].join(', ');
 
-const toAbsoluteUploadUrl = (req, url) => {
-  if (typeof url !== 'string') {
-    return url;
-  }
-  if (!url.startsWith('/uploads') && !url.startsWith('uploads/')) {
-    return url;
-  }
-  const base = `${req.protocol}://${req.get('host')}`;
-  const normalized = url.startsWith('/') ? url : `/${url}`;
-  return `${base}${normalized}`;
-};
+const PRODUCT_COLUMNS = [
+  'id',
+  'farmer_id',
+  '"product name"',
+  'category',
+  'type',
+  'Unit',
+  'Price',
+  '"photo url"',
+  '"bio check"',
+  'available',
+].join(', ');
 
-const normalizeUploadImage = (req, image) => {
-  if (!image?.url || !isLocalUpload(image)) {
-    return image;
-  }
-  const normalizedUrl = toAbsoluteUploadUrl(req, image.url);
-  return {
-    ...image,
-    url: normalizedUrl,
-    photoUrl: image.photoUrl
-      ? toAbsoluteUploadUrl(req, image.photoUrl)
-      : image.photoUrl,
-    source: image.source || 'upload',
-  };
-};
+const resolveArray = (value) => (Array.isArray(value) ? value : []);
 
-const normalizeFarmImages = (req, farmImages) => {
-  if (!Array.isArray(farmImages)) {
-    return [];
+const fetchFarmersWithRelations = async () => {
+  const { data: farmers, error: farmersError } = await supabase
+    .from(TABLES.farmers)
+    .select(FARMER_COLUMNS);
+  if (farmersError) {
+    throw new Error(farmersError.message || 'Unable to load farmers.');
   }
 
-  const seen = new Set();
-  const normalized = [];
-  for (const imageUrl of farmImages) {
-    if (typeof imageUrl !== 'string') {
-      continue;
-    }
-    const trimmed = imageUrl.trim();
-    if (!trimmed) {
-      continue;
-    }
-    const relative = trimmed.includes('/uploads/')
-      ? trimmed.slice(trimmed.indexOf('/uploads/'))
-      : trimmed.startsWith('uploads/')
-        ? `/${trimmed}`
-        : trimmed;
-    if (seen.has(relative)) {
-      continue;
-    }
-    seen.add(relative);
-    normalized.push(toAbsoluteUploadUrl(req, relative));
-    if (normalized.length >= 10) {
-      break;
-    }
+  const safeFarmers = resolveArray(farmers);
+  const farmerIds = safeFarmers.map((entry) => entry.id);
+  const userIds = safeFarmers.map((entry) => entry.id);
+
+  const [{ data: users }, { data: products }, { data: farmPhotos }] = await Promise.all([
+    supabase
+      .from(TABLES.users)
+      .select('id, email')
+      .in('id', userIds.length > 0 ? userIds : [-1]),
+    supabase
+      .from(TABLES.products)
+      .select(PRODUCT_COLUMNS)
+      .in('farmer_id', farmerIds.length > 0 ? farmerIds : [-1]),
+    supabase
+      .from(TABLES.farmPhotos)
+      .select('id, farmer_id, image_url, caption, is_cover')
+      .in('farmer_id', farmerIds.length > 0 ? farmerIds : [-1]),
+  ]);
+
+  const usersById = new Map(resolveArray(users).map((entry) => [entry.id, entry]));
+  const productsByFarmer = new Map();
+  for (const product of resolveArray(products)) {
+    const list = productsByFarmer.get(product.farmer_id) || [];
+    list.push(product);
+    productsByFarmer.set(product.farmer_id, list);
   }
-  return normalized;
+
+  const photosByFarmer = new Map();
+  for (const photo of resolveArray(farmPhotos)) {
+    const list = photosByFarmer.get(photo.farmer_id) || [];
+    list.push(photo);
+    photosByFarmer.set(photo.farmer_id, list);
+  }
+
+  return safeFarmers.map((farmer) => ({
+    farmer,
+    user: usersById.get(farmer.id) || null,
+    products: productsByFarmer.get(farmer.id) || [],
+    farmPhotos: photosByFarmer.get(farmer.id) || [],
+  }));
 };
 
-const toTimestamp = (value) => {
-  const timestamp = Date.parse(value);
-  return Number.isFinite(timestamp) ? timestamp : 0;
-};
-
-const toPublicVendor = (req, vendor) => ({
-  id: vendor.id,
-  farmName: vendor.farmName || '',
-  displayName: vendor.displayName || '',
-  streetAddress: vendor.streetAddress || '',
-  streetNumber: vendor.streetNumber || '',
-  county: vendor.county || '',
-  city: vendor.city || '',
-  phoneNumber: vendor.phoneNumber || '',
-  email: vendor.email || '',
-  deliveryRadiusKm:
-    typeof vendor.deliveryRadiusKm === 'number' &&
-    Number.isFinite(vendor.deliveryRadiusKm)
-      ? vendor.deliveryRadiusKm
-      : null,
-  bio: vendor.bio || '',
-  farmImages: normalizeFarmImages(req, vendor.farmImages),
-});
-
-router.get('/', async (req, res, next) => {
+router.get('/', async (_req, res, next) => {
   try {
-    const vendorsData = await readJson(paths.vendors, { vendors: [] });
-    const vendors = Array.isArray(vendorsData.vendors) ? vendorsData.vendors : [];
-    const productsData = await readJson(paths.products, { products: [] });
-    const products = Array.isArray(productsData.products)
-      ? productsData.products
-      : [];
-
-    const productCountByVendor = new Map();
-    const ratingStatsByVendor = new Map();
-    for (const product of products) {
-      if (!product?.vendorId) {
-        continue;
-      }
-      const current = productCountByVendor.get(product.vendorId) || 0;
-      productCountByVendor.set(product.vendorId, current + 1);
-
-      const rating = Number(product.rating);
-      if (Number.isFinite(rating)) {
-        const stats = ratingStatsByVendor.get(product.vendorId) || {
-          sum: 0,
-          count: 0,
-        };
-        stats.sum += rating;
-        stats.count += 1;
-        ratingStatsByVendor.set(product.vendorId, stats);
-      }
-    }
-
-    const list = vendors
-      .map((vendor) => {
-        const ratingStats = ratingStatsByVendor.get(vendor.id);
-        const vendorRating =
-          ratingStats && ratingStats.count > 0
-            ? Number((ratingStats.sum / ratingStats.count).toFixed(1))
-            : null;
+    const rows = await fetchFarmersWithRelations();
+    const vendors = rows
+      .map((entry) => {
+        const vendor = mapFarmerToVendor(entry.farmer, {
+          email: entry.user?.email || '',
+          farmPhotos: entry.farmPhotos,
+        });
+        const productCount = entry.products.length;
+        const vendorRating = productCount > 0 ? 4 : null;
 
         return {
-          ...toPublicVendor(req, vendor),
-          productCount: productCountByVendor.get(vendor.id) || 0,
+          ...vendor,
+          productCount,
           vendorRating,
         };
       })
@@ -150,7 +111,7 @@ router.get('/', async (req, res, next) => {
         ),
       );
 
-    return res.json({ vendors: list });
+    return res.json({ vendors });
   } catch (error) {
     return next(error);
   }
@@ -163,36 +124,25 @@ router.get('/:vendorId', async (req, res, next) => {
       return res.status(400).json({ error: 'vendorId is required.' });
     }
 
-    const vendorsData = await readJson(paths.vendors, { vendors: [] });
-    const vendors = Array.isArray(vendorsData.vendors) ? vendorsData.vendors : [];
-    const vendor = vendors.find((entry) => entry.id === vendorId);
-    if (!vendor) {
+    const rows = await fetchFarmersWithRelations();
+    const match = rows.find((entry) => String(entry.farmer.id) === String(vendorId));
+    if (!match) {
       return res.status(404).json({ error: 'Vendor profile not found.' });
     }
 
-    const productsData = await readJson(paths.products, { products: [] });
-    const products = Array.isArray(productsData.products)
-      ? productsData.products
-      : [];
-    const vendorProducts = products
-      .filter((product) => product.vendorId === vendor.id)
-      .sort((a, b) => toTimestamp(b.createdAt) - toTimestamp(a.createdAt))
-      .map((product) => ({
-        id: product.id,
-        name: product.name,
-        category: product.category,
-        type: product.type || '',
-        unit: product.unit || 'unit',
-        price: Number.isFinite(product.price) ? product.price : null,
-        rating: Number.isFinite(product.rating) ? product.rating : null,
-        available: product.available !== false,
-        isBio: Boolean(product.isBio),
-        image: normalizeUploadImage(req, product.image || null),
-      }));
+    const vendor = mapFarmerToVendor(match.farmer, {
+      email: match.user?.email || '',
+      farmPhotos: match.farmPhotos,
+    });
+
+    const products = match.products
+      .slice()
+      .sort((a, b) => Number(b.id || 0) - Number(a.id || 0))
+      .map((product) => mapProductToApi(product));
 
     return res.json({
-      vendor: toPublicVendor(req, vendor),
-      products: vendorProducts,
+      vendor,
+      products,
     });
   } catch (error) {
     return next(error);
