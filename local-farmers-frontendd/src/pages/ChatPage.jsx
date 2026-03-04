@@ -3,8 +3,7 @@ import { Link, useSearchParams } from 'react-router-dom';
 
 import { apiFetch } from '../lib/api.js';
 import { useAuth } from '../lib/auth.jsx';
-
-const POLL_MS = 4000;
+import { supabase } from '../lib/supabase.js';
 
 const formatTime = (value) => {
   if (!value) {
@@ -24,6 +23,7 @@ export default function ChatPage() {
 
   const [conversations, setConversations] = useState([]);
   const [selectedConversationId, setSelectedConversationId] = useState('');
+  const [currentVendorId, setCurrentVendorId] = useState('');
   const [detail, setDetail] = useState(null);
   const [listStatus, setListStatus] = useState({ state: 'loading', message: '' });
   const [detailStatus, setDetailStatus] = useState({
@@ -50,7 +50,12 @@ export default function ChatPage() {
       }
 
       const nextConversations = data.conversations || [];
+      const resolvedVendorId =
+        typeof data.vendorId === 'string' && data.vendorId.trim()
+          ? data.vendorId.trim()
+          : '';
       setConversations(nextConversations);
+      setCurrentVendorId(resolvedVendorId);
       setListStatus({ state: 'success', message: '' });
       setSelectedConversationId((prev) => {
         if (prev && nextConversations.some((entry) => entry.id === prev)) {
@@ -59,6 +64,7 @@ export default function ChatPage() {
         return nextConversations[0]?.id || '';
       });
     } catch (error) {
+      setCurrentVendorId('');
       setListStatus({
         state: 'error',
         message: error.message || 'Unable to load conversations.',
@@ -97,10 +103,57 @@ export default function ChatPage() {
       return undefined;
     }
 
-    loadConversations();
-    const timerId = window.setInterval(loadConversations, POLL_MS);
-    return () => window.clearInterval(timerId);
-  }, [authStatus, user, isAllowedRole, loadConversations]);
+    let active = true;
+    let channel = null;
+
+    const subscribeToConversations = async () => {
+      await loadConversations();
+      if (!active) {
+        return;
+      }
+
+      const participantId =
+        user.role === 'vendor' ? currentVendorId || user.id : user.id;
+      if (!participantId) {
+        return;
+      }
+
+      const filter =
+        user.role === 'customer'
+          ? `customer_id=eq.${participantId}`
+          : `vendor_id=eq.${participantId}`;
+
+      channel = supabase
+        .channel(`chat-conversations-${user.id}-${participantId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'conversations',
+            filter,
+          },
+          () => {
+            loadConversations().catch(() => {});
+          },
+        )
+        .subscribe();
+    };
+
+    subscribeToConversations().catch(() => {});
+    return () => {
+      active = false;
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
+    };
+  }, [
+    authStatus,
+    user,
+    isAllowedRole,
+    loadConversations,
+    currentVendorId,
+  ]);
 
   useEffect(() => {
     if (
@@ -166,17 +219,42 @@ export default function ChatPage() {
       return undefined;
     }
 
+    let active = true;
+
     loadConversationDetail(selectedConversationId);
-    const timerId = window.setInterval(() => {
-      loadConversationDetail(selectedConversationId);
-    }, POLL_MS);
-    return () => window.clearInterval(timerId);
+    const channel = supabase
+      .channel(`chat-messages-${selectedConversationId}`)
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'messages',
+          filter: `conversation_id=eq.${selectedConversationId}`,
+        },
+        () => {
+          if (!active) {
+            return;
+          }
+          Promise.all([
+            loadConversationDetail(selectedConversationId),
+            loadConversations(),
+          ]).catch(() => {});
+        },
+      )
+      .subscribe();
+
+    return () => {
+      active = false;
+      supabase.removeChannel(channel);
+    };
   }, [
     authStatus,
     user,
     isAllowedRole,
     selectedConversationId,
     loadConversationDetail,
+    loadConversations,
   ]);
 
   const selectedConversation = useMemo(

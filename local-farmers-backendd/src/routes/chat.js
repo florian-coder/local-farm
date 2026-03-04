@@ -1,20 +1,27 @@
 const express = require('express');
-const crypto = require('crypto');
 
-const { paths } = require('../lib/dataPaths');
-const { readJson, updateJson } = require('../lib/fileStore');
 const { requireAuth } = require('../middleware/auth');
 const { supabase, TABLES } = require('../lib/supabase');
 
 const router = express.Router();
 
 const MAX_MESSAGE_LENGTH = 1200;
+const CONVERSATION_COLUMNS =
+  'id, vendor_id, customer_id, created_at, updated_at, unread_for_customer, unread_for_vendor';
+const MESSAGE_COLUMNS = 'id, conversation_id, sender_user_id, text, created_at';
 
 const normalizeMessageText = (value) => {
   if (typeof value !== 'string') {
     return '';
   }
   return value.trim().slice(0, MAX_MESSAGE_LENGTH);
+};
+
+const normalizeIdentifier = (value) => {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  return String(value).trim();
 };
 
 const toTimestamp = (value) => {
@@ -32,11 +39,108 @@ const toUnreadCount = (value) => {
 
 const resolveArray = (value) => (Array.isArray(value) ? value : []);
 
+const mapConversationRow = (row) => ({
+  id: normalizeIdentifier(row.id),
+  vendorId: normalizeIdentifier(row.vendor_id),
+  customerId: normalizeIdentifier(row.customer_id),
+  createdAt: row.created_at || null,
+  updatedAt: row.updated_at || null,
+  unreadForCustomer: toUnreadCount(row.unread_for_customer),
+  unreadForVendor: toUnreadCount(row.unread_for_vendor),
+});
+
+const mapMessageRow = (row) => ({
+  id: normalizeIdentifier(row.id),
+  conversationId: normalizeIdentifier(row.conversation_id),
+  senderId: normalizeIdentifier(row.sender_user_id),
+  text: row.text || '',
+  createdAt: row.created_at || null,
+});
+
+const fetchMessagesByConversationIds = async (
+  conversationIds,
+  { ascending = true } = {},
+) => {
+  const ids = resolveArray(conversationIds)
+    .map((value) => normalizeIdentifier(value))
+    .filter(Boolean);
+  if (ids.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from(TABLES.messages)
+    .select(MESSAGE_COLUMNS)
+    .in('conversation_id', ids)
+    .order('created_at', { ascending })
+    .order('id', { ascending });
+
+  if (error) {
+    throw new Error(error.message || 'Unable to load conversation messages.');
+  }
+
+  return resolveArray(data).map(mapMessageRow);
+};
+
+const fetchConversationById = async (conversationId) => {
+  const id = normalizeIdentifier(conversationId);
+  if (!id) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from(TABLES.conversations)
+    .select(CONVERSATION_COLUMNS)
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message || 'Unable to load conversation.');
+  }
+  if (!data) {
+    return null;
+  }
+
+  return mapConversationRow(data);
+};
+
+const fetchConversationsForUser = async (user, vendorRecord) => {
+  if (!user) {
+    return [];
+  }
+
+  const userId = normalizeIdentifier(user.id);
+  if (!userId) {
+    return [];
+  }
+
+  if (user.role === 'vendor' && !vendorRecord) {
+    return [];
+  }
+
+  const query = supabase.from(TABLES.conversations).select(CONVERSATION_COLUMNS);
+  if (user.role === 'customer') {
+    query.eq('customer_id', userId);
+  } else if (user.role === 'vendor') {
+    query.eq('vendor_id', normalizeIdentifier(vendorRecord.id));
+  } else {
+    return [];
+  }
+
+  const { data, error } = await query
+    .order('updated_at', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message || 'Unable to load conversations.');
+  }
+
+  return resolveArray(data).map(mapConversationRow);
+};
+
 const fetchChatContext = async () => {
   const [usersResult, customersResult, farmersResult] = await Promise.all([
-    supabase
-      .from(TABLES.users)
-      .select('id, username, email, user_type'),
+    supabase.from(TABLES.users).select('id, username, email, user_type'),
     supabase
       .from(TABLES.customers)
       .select(
@@ -60,12 +164,16 @@ const fetchChatContext = async () => {
   }
 
   const customersByUserId = new Map(
-    resolveArray(customersResult.data).map((entry) => [String(entry.id), entry]),
+    resolveArray(customersResult.data).map((entry) => [
+      normalizeIdentifier(entry.id),
+      entry,
+    ]),
   );
   const users = resolveArray(usersResult.data).map((entry) => {
-    const customer = customersByUserId.get(String(entry.id)) || null;
+    const userId = normalizeIdentifier(entry.id);
+    const customer = customersByUserId.get(userId) || null;
     return {
-      id: String(entry.id),
+      id: userId,
       username: entry.username || '',
       firstName: customer?.name || '',
       lastName: customer?.surname || '',
@@ -79,20 +187,23 @@ const fetchChatContext = async () => {
     };
   });
 
-  const usersById = new Map(users.map((entry) => [String(entry.id), entry]));
-  const vendors = resolveArray(farmersResult.data).map((entry) => ({
-    id: String(entry.id),
-    userId: String(entry.id),
-    farmName: entry['farm name'] || '',
-    displayName: entry['display name'] || '',
-    streetAddress: entry['street address'] || '',
-    streetNumber: entry['street number'] || '',
-    county: entry.county || '',
-    city: entry.city || '',
-    phoneNumber: entry['phone number'] || '',
-    email: entry.email || usersById.get(String(entry.id))?.email || '',
-    bio: entry.bio || '',
-  }));
+  const usersById = new Map(users.map((entry) => [entry.id, entry]));
+  const vendors = resolveArray(farmersResult.data).map((entry) => {
+    const vendorId = normalizeIdentifier(entry.id);
+    return {
+      id: vendorId,
+      userId: vendorId,
+      farmName: entry['farm name'] || '',
+      displayName: entry['display name'] || '',
+      streetAddress: entry['street address'] || '',
+      streetNumber: entry['street number'] || '',
+      county: entry.county || '',
+      city: entry.city || '',
+      phoneNumber: entry['phone number'] || '',
+      email: entry.email || usersById.get(vendorId)?.email || '',
+      bio: entry.bio || '',
+    };
+  });
 
   return { users, vendors };
 };
@@ -101,15 +212,18 @@ const resolveVendorForUser = (user, vendors) => {
   if (!user || user.role !== 'vendor') {
     return null;
   }
-  return vendors.find((entry) => entry.userId === user.id) || null;
+  const userId = normalizeIdentifier(user.id);
+  return vendors.find((entry) => entry.userId === userId) || null;
 };
 
 const canAccessConversation = (user, vendorRecord, conversation) => {
   if (!user || !conversation) {
     return false;
   }
+
+  const userId = normalizeIdentifier(user.id);
   if (user.role === 'customer') {
-    return conversation.customerId === user.id;
+    return conversation.customerId === userId;
   }
   if (user.role === 'vendor') {
     return Boolean(vendorRecord && conversation.vendorId === vendorRecord.id);
@@ -164,7 +278,7 @@ const toSummaryParticipant = (currentUser, conversation, usersById, vendorsById)
 };
 
 const toConversationSummary = (currentUser, conversation, usersById, vendorsById) => {
-  const messages = Array.isArray(conversation.messages) ? conversation.messages : [];
+  const messages = resolveArray(conversation.messages);
   const lastMessage = messages[messages.length - 1] || null;
   const lastMessageAt =
     lastMessage?.createdAt || conversation.updatedAt || conversation.createdAt || null;
@@ -205,19 +319,16 @@ const toConversationDetails = (
 ) => {
   const vendor = vendorsById.get(conversation.vendorId) || null;
   const customer = usersById.get(conversation.customerId) || null;
-  const messages = Array.isArray(conversation.messages) ? conversation.messages : [];
+  const messages = resolveArray(conversation.messages);
 
   return {
     ...toConversationSummary(currentUser, conversation, usersById, vendorsById),
     messages: messages.map((message) => {
-      const sender =
-        message.senderId === conversation.customerId ? customer : usersById.get(vendor?.userId);
-      const senderRole =
-        message.senderId === conversation.customerId ? 'customer' : 'vendor';
-      const senderName =
-        senderRole === 'customer'
-          ? toCustomerDisplayName(customer)
-          : toVendorDisplayName(vendor);
+      const isCustomerMessage = message.senderId === conversation.customerId;
+      const senderRole = isCustomerMessage ? 'customer' : 'vendor';
+      const senderName = isCustomerMessage
+        ? toCustomerDisplayName(customer)
+        : toVendorDisplayName(vendor);
 
       return {
         id: message.id,
@@ -233,22 +344,38 @@ const toConversationDetails = (
 
 router.get('/conversations', requireAuth, async (req, res, next) => {
   try {
-    const chatsData = await readJson(paths.chats, { conversations: [] });
     const { users, vendors } = await fetchChatContext();
-
-    const conversations = Array.isArray(chatsData.conversations)
-      ? chatsData.conversations
-      : [];
-
     const currentVendor = resolveVendorForUser(req.user, vendors);
+
+    const conversations = await fetchConversationsForUser(req.user, currentVendor);
     const userConversations = conversations.filter((conversation) =>
       canAccessConversation(req.user, currentVendor, conversation),
     );
 
-    const usersById = new Map(users.map((user) => [user.id, user]));
-    const vendorsById = new Map(vendors.map((vendor) => [vendor.id, vendor]));
+    const conversationIds = userConversations.map((entry) => entry.id);
+    const latestMessages = await fetchMessagesByConversationIds(conversationIds, {
+      ascending: false,
+    });
+    const latestByConversationId = new Map();
+    for (const message of latestMessages) {
+      if (latestByConversationId.has(message.conversationId)) {
+        continue;
+      }
+      latestByConversationId.set(message.conversationId, message);
+    }
 
-    const summaries = userConversations
+    const conversationsWithLatestMessage = userConversations.map((conversation) => {
+      const lastMessage = latestByConversationId.get(conversation.id) || null;
+      return {
+        ...conversation,
+        messages: lastMessage ? [lastMessage] : [],
+      };
+    });
+
+    const usersById = new Map(users.map((entry) => [entry.id, entry]));
+    const vendorsById = new Map(vendors.map((entry) => [entry.id, entry]));
+
+    const summaries = conversationsWithLatestMessage
       .map((conversation) =>
         toConversationSummary(req.user, conversation, usersById, vendorsById),
       )
@@ -277,54 +404,87 @@ router.post('/conversations/start', requireAuth, async (req, res, next) => {
       });
     }
 
-    const { vendorId } = req.body || {};
-    if (!vendorId || typeof vendorId !== 'string') {
+    const vendorId = normalizeIdentifier(req.body?.vendorId);
+    if (!vendorId) {
       return res.status(400).json({ error: 'vendorId is required.' });
     }
 
+    const customerId = normalizeIdentifier(req.user.id);
     const { users, vendors } = await fetchChatContext();
     const vendor = vendors.find((entry) => entry.id === vendorId);
     if (!vendor) {
       return res.status(404).json({ error: 'Vendor not found.' });
     }
 
-    const conversation = await updateJson(paths.chats, { conversations: [] }, (data) => {
-      const conversations = Array.isArray(data.conversations)
-        ? data.conversations
-        : [];
-      const existing = conversations.find(
-        (entry) =>
-          entry.vendorId === vendorId && entry.customerId === req.user.id,
+    const { data: existingConversationRow, error: existingConversationError } =
+      await supabase
+        .from(TABLES.conversations)
+        .select(CONVERSATION_COLUMNS)
+        .eq('vendor_id', vendorId)
+        .eq('customer_id', customerId)
+        .maybeSingle();
+
+    if (existingConversationError) {
+      throw new Error(
+        existingConversationError.message || 'Unable to verify existing conversation.',
       );
-      if (existing) {
-        return { data: { conversations }, result: existing };
-      }
+    }
 
+    let conversationRow = existingConversationRow || null;
+    if (!conversationRow) {
       const now = new Date().toISOString();
-      const created = {
-        id: crypto.randomUUID(),
-        vendorId,
-        customerId: req.user.id,
-        createdAt: now,
-        updatedAt: now,
-        unreadForCustomer: 0,
-        unreadForVendor: 0,
-        messages: [],
-      };
-      conversations.push(created);
-      return { data: { conversations }, result: created };
-    });
+      const { data: createdConversationRow, error: createConversationError } =
+        await supabase
+          .from(TABLES.conversations)
+          .insert({
+            vendor_id: vendorId,
+            customer_id: customerId,
+            created_at: now,
+            updated_at: now,
+            unread_for_customer: 0,
+            unread_for_vendor: 0,
+          })
+          .select(CONVERSATION_COLUMNS)
+          .single();
 
-    const usersById = new Map(users.map((user) => [user.id, user]));
+      if (createConversationError) {
+        // Handle concurrent starts where another request created the same row.
+        if (createConversationError.code === '23505') {
+          const {
+            data: retryConversationRow,
+            error: retryConversationError,
+          } = await supabase
+            .from(TABLES.conversations)
+            .select(CONVERSATION_COLUMNS)
+            .eq('vendor_id', vendorId)
+            .eq('customer_id', customerId)
+            .maybeSingle();
+
+          if (retryConversationError || !retryConversationRow) {
+            throw new Error(
+              retryConversationError?.message ||
+                createConversationError.message ||
+                'Unable to start conversation.',
+            );
+          }
+          conversationRow = retryConversationRow;
+        } else {
+          throw new Error(createConversationError.message || 'Unable to start conversation.');
+        }
+      } else {
+        conversationRow = createdConversationRow;
+      }
+    }
+
+    const conversation = {
+      ...mapConversationRow(conversationRow),
+      messages: [],
+    };
+    const usersById = new Map(users.map((entry) => [entry.id, entry]));
     const vendorsById = new Map(vendors.map((entry) => [entry.id, entry]));
 
     return res.status(201).json({
-      conversation: toConversationSummary(
-        req.user,
-        conversation,
-        usersById,
-        vendorsById,
-      ),
+      conversation: toConversationSummary(req.user, conversation, usersById, vendorsById),
     });
   } catch (error) {
     return next(error);
@@ -333,17 +493,12 @@ router.post('/conversations/start', requireAuth, async (req, res, next) => {
 
 router.get('/conversations/:conversationId', requireAuth, async (req, res, next) => {
   try {
-    const { conversationId } = req.params;
+    const conversationId = normalizeIdentifier(req.params.conversationId);
     if (!conversationId) {
       return res.status(400).json({ error: 'conversationId is required.' });
     }
 
-    const chatsData = await readJson(paths.chats, { conversations: [] });
-    const conversations = Array.isArray(chatsData.conversations)
-      ? chatsData.conversations
-      : [];
-    const conversation =
-      conversations.find((entry) => entry.id === conversationId) || null;
+    const conversation = await fetchConversationById(conversationId);
     if (!conversation) {
       return res.status(404).json({ error: 'Conversation not found.' });
     }
@@ -355,35 +510,38 @@ router.get('/conversations/:conversationId', requireAuth, async (req, res, next)
     }
 
     const unreadField =
-      req.user.role === 'customer' ? 'unreadForCustomer' : 'unreadForVendor';
+      req.user.role === 'customer' ? 'unread_for_customer' : 'unread_for_vendor';
 
-    const updatedConversation = await updateJson(
-      paths.chats,
-      { conversations: [] },
-      (data) => {
-        const list = Array.isArray(data.conversations) ? data.conversations : [];
-        let result = null;
-        const nextConversations = list.map((entry) => {
-          if (entry.id !== conversationId) {
-            return entry;
-          }
-          const nextEntry = {
-            ...entry,
-            [unreadField]: 0,
-          };
-          result = nextEntry;
-          return nextEntry;
-        });
-        return { data: { conversations: nextConversations }, result };
-      },
-    );
+    const { data: updatedConversationRow, error: updateConversationError } = await supabase
+      .from(TABLES.conversations)
+      .update({ [unreadField]: 0 })
+      .eq('id', conversationId)
+      .select(CONVERSATION_COLUMNS)
+      .maybeSingle();
+
+    if (updateConversationError) {
+      throw new Error(
+        updateConversationError.message || 'Unable to mark conversation as read.',
+      );
+    }
+
+    const messages = await fetchMessagesByConversationIds([conversationId], {
+      ascending: true,
+    });
+    const effectiveConversation = updatedConversationRow
+      ? mapConversationRow(updatedConversationRow)
+      : conversation;
+    const conversationWithMessages = {
+      ...effectiveConversation,
+      messages,
+    };
 
     const usersById = new Map(users.map((entry) => [entry.id, entry]));
     const vendorsById = new Map(vendors.map((entry) => [entry.id, entry]));
     return res.json({
       conversation: toConversationDetails(
         req.user,
-        updatedConversation || conversation,
+        conversationWithMessages,
         usersById,
         vendorsById,
       ),
@@ -398,7 +556,7 @@ router.post(
   requireAuth,
   async (req, res, next) => {
     try {
-      const { conversationId } = req.params;
+      const conversationId = normalizeIdentifier(req.params.conversationId);
       if (!conversationId) {
         return res.status(400).json({ error: 'conversationId is required.' });
       }
@@ -408,12 +566,7 @@ router.post(
         return res.status(400).json({ error: 'Message text is required.' });
       }
 
-      const chatsData = await readJson(paths.chats, { conversations: [] });
-      const conversations = Array.isArray(chatsData.conversations)
-        ? chatsData.conversations
-        : [];
-      const currentConversation =
-        conversations.find((entry) => entry.id === conversationId) || null;
+      const currentConversation = await fetchConversationById(conversationId);
       if (!currentConversation) {
         return res.status(404).json({ error: 'Conversation not found.' });
       }
@@ -425,35 +578,49 @@ router.post(
       }
 
       const now = new Date().toISOString();
-      const message = {
-        id: crypto.randomUUID(),
-        senderId: req.user.id,
-        text,
-        createdAt: now,
-      };
+      const { data: insertedMessageRow, error: insertMessageError } = await supabase
+        .from(TABLES.messages)
+        .insert({
+          conversation_id: conversationId,
+          sender_user_id: normalizeIdentifier(req.user.id),
+          text,
+          created_at: now,
+        })
+        .select(MESSAGE_COLUMNS)
+        .single();
 
-      await updateJson(paths.chats, { conversations: [] }, (data) => {
-        const list = Array.isArray(data.conversations) ? data.conversations : [];
-        const nextConversations = list.map((entry) => {
-          if (entry.id !== conversationId) {
-            return entry;
-          }
-          const messages = Array.isArray(entry.messages) ? entry.messages : [];
-          const unreadForCustomer = toUnreadCount(entry.unreadForCustomer);
-          const unreadForVendor = toUnreadCount(entry.unreadForVendor);
-          const isCustomerSender = req.user.role === 'customer';
-          return {
-            ...entry,
-            messages: [...messages, message],
-            updatedAt: now,
-            unreadForCustomer: isCustomerSender ? 0 : unreadForCustomer + 1,
-            unreadForVendor: isCustomerSender ? unreadForVendor + 1 : 0,
-          };
-        });
-        return { data: { conversations: nextConversations }, result: null };
+      if (insertMessageError || !insertedMessageRow) {
+        throw new Error(insertMessageError?.message || 'Unable to send message.');
+      }
+
+      const message = mapMessageRow(insertedMessageRow);
+      const isCustomerSender = req.user.role === 'customer';
+      const unreadForCustomer = toUnreadCount(currentConversation.unreadForCustomer);
+      const unreadForVendor = toUnreadCount(currentConversation.unreadForVendor);
+
+      const { error: updateConversationError } = await supabase
+        .from(TABLES.conversations)
+        .update({
+          updated_at: message.createdAt || now,
+          unread_for_customer: isCustomerSender ? 0 : unreadForCustomer + 1,
+          unread_for_vendor: isCustomerSender ? unreadForVendor + 1 : 0,
+        })
+        .eq('id', conversationId);
+
+      if (updateConversationError) {
+        throw new Error(
+          updateConversationError.message || 'Unable to update conversation metadata.',
+        );
+      }
+
+      return res.status(201).json({
+        message: {
+          id: message.id,
+          senderId: message.senderId,
+          text: message.text,
+          createdAt: message.createdAt,
+        },
       });
-
-      return res.status(201).json({ message });
     } catch (error) {
       return next(error);
     }

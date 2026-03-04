@@ -26,6 +26,8 @@ const TABLES = {
   customers: 'customers',
   products: 'products',
   farmPhotos: 'farm_photos',
+  conversations: 'conversations',
+  messages: 'messages',
 };
 
 const dedupe = (values) => {

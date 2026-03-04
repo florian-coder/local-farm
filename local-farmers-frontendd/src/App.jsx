@@ -21,6 +21,7 @@ import VendorProductsPage from './pages/VendorProductsPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import { apiFetch } from './lib/api.js';
 import { AuthProvider, useAuth } from './lib/auth.jsx';
+import { supabase } from './lib/supabase.js';
 
 function Navigation() {
   const location = useLocation();
@@ -46,17 +47,18 @@ function Navigation() {
     }
 
     let active = true;
+    let channel = null;
     const loadUnread = async () => {
       try {
         const response = await apiFetch('/api/chat/conversations', { method: 'GET' });
         const data = await response.json();
         if (!active || !response.ok) {
-          return;
+          return null;
         }
         const totalUnread = Number(data.totalUnread);
         if (Number.isFinite(totalUnread) && totalUnread > 0) {
           setChatUnreadCount(Math.floor(totalUnread));
-          return;
+          return data;
         }
         const fallbackUnread = Array.isArray(data.conversations)
           ? data.conversations.reduce((sum, entry) => {
@@ -65,20 +67,62 @@ function Navigation() {
             }, 0)
           : 0;
         setChatUnreadCount(fallbackUnread > 0 ? Math.floor(fallbackUnread) : 0);
+        return data;
       } catch (error) {
         if (active) {
           setChatUnreadCount(0);
         }
+        return null;
       }
     };
 
-    loadUnread();
-    const timerId = window.setInterval(loadUnread, 4000);
+    const subscribeToUnread = async () => {
+      const data = await loadUnread();
+      if (!active) {
+        return;
+      }
+
+      const vendorIdFromApi =
+        typeof data?.vendorId === 'string' && data.vendorId.trim()
+          ? data.vendorId.trim()
+          : '';
+      const participantId =
+        user?.role === 'vendor' && vendorIdFromApi ? vendorIdFromApi : user?.id;
+      if (!participantId) {
+        return;
+      }
+
+      const filter =
+        user?.role === 'customer'
+          ? `customer_id=eq.${participantId}`
+          : `vendor_id=eq.${participantId}`;
+
+      channel = supabase
+        .channel(`nav-chat-unread-${user?.id}-${participantId}`)
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'conversations',
+            filter,
+          },
+          () => {
+            loadUnread().catch(() => {});
+          },
+        )
+        .subscribe();
+    };
+
+    subscribeToUnread().catch(() => {});
+
     return () => {
       active = false;
-      window.clearInterval(timerId);
+      if (channel) {
+        supabase.removeChannel(channel);
+      }
     };
-  }, [isChatEnabled, user?.id, location.pathname]);
+  }, [isChatEnabled, user?.id, user?.role]);
 
   return (
     <nav className="nav">
