@@ -27,6 +27,11 @@ const formatNumber = (value) => {
   return Number.isFinite(parsed) ? String(parsed) : 'N/A';
 };
 
+const formatPrice = (value) => {
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed.toFixed(2) : '0.00';
+};
+
 const normalizeInlineText = (value) => {
   if (typeof value !== 'string') {
     return '';
@@ -70,8 +75,8 @@ export default function AdminPage() {
   });
   const [rejectionNotes, setRejectionNotes] = useState({});
   const [expandedRequests, setExpandedRequests] = useState({});
-  const adminPath = location.pathname.startsWith('/admin')
-    ? location.pathname.slice('/admin'.length).replace(/^\/+/, '')
+  const adminPath = location.pathname.startsWith('/manage-portal')
+    ? location.pathname.slice('/manage-portal'.length).replace(/^\/+/, '')
     : '';
   const tabSegment = adminPath.split('/')[0] || '';
   const activeTab = tabSegment === 'approved' ? 'approved' : 'pending';
@@ -136,7 +141,7 @@ export default function AdminPage() {
     }
     const isValidTab = tabSegment === 'pending' || tabSegment === 'approved';
     if (!isValidTab) {
-      navigate('/admin/pending', { replace: true });
+      navigate('/manage-portal/pending', { replace: true });
     }
   }, [sessionStatus, tabSegment, navigate]);
 
@@ -244,6 +249,68 @@ export default function AdminPage() {
     }
   };
 
+  const handleDeleteFarm = async (requestId) => {
+    if (!requestId) {
+      return;
+    }
+    if (!window.confirm('Delete this approved farm and all of its products? This action cannot be undone.')) {
+      return;
+    }
+
+    setActionStatus({ state: 'loading', message: 'Deleting farm and products...' });
+    try {
+      const response = await apiFetch(`/api/admin/farmer-requests/${requestId}/farm`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Unable to delete farm.');
+      }
+      const deletedProductsCount = Number(data?.deleted?.products) || 0;
+      setActionStatus({
+        state: 'success',
+        message: `Farm deleted. Removed ${deletedProductsCount} product(s).`,
+      });
+      await loadRequests();
+    } catch (error) {
+      setActionStatus({
+        state: 'error',
+        message: error.message || 'Unable to delete farm.',
+      });
+    }
+  };
+
+  const handleDeleteProduct = async (productId) => {
+    if (!productId) {
+      return;
+    }
+    if (!window.confirm('Delete this product? This action cannot be undone.')) {
+      return;
+    }
+
+    setActionStatus({ state: 'loading', message: 'Deleting product...' });
+    try {
+      const response = await apiFetch(`/api/admin/products/${productId}`, {
+        method: 'DELETE',
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Unable to delete product.');
+      }
+      const deletedProductName = formatText(data?.product?.name);
+      setActionStatus({
+        state: 'success',
+        message: `Product deleted: ${deletedProductName}.`,
+      });
+      await loadRequests();
+    } catch (error) {
+      setActionStatus({
+        state: 'error',
+        message: error.message || 'Unable to delete product.',
+      });
+    }
+  };
+
   const updateRejectionNote = (requestId, value) => {
     setRejectionNotes((prev) => ({
       ...prev,
@@ -266,6 +333,8 @@ export default function AdminPage() {
 
   const renderRequestCard = (request, options = { withActions: false }) => {
     const isExpanded = Boolean(expandedRequests[request.id]);
+    const requestProducts = Array.isArray(request.products) ? request.products : [];
+    const showProductsBlock = Boolean(options.withProductActions) || requestProducts.length > 0;
     return (
       <article className="admin-request-card" key={request.id}>
         <header className="admin-request-top">
@@ -362,6 +431,50 @@ export default function AdminPage() {
               )}
             </div>
 
+            {showProductsBlock && (
+              <div className="admin-request-field">
+                <p className="admin-request-label">Products</p>
+                {requestProducts.length > 0 ? (
+                  <div className="stack">
+                    {requestProducts.map((product) => (
+                      <div className="product-row" key={`${request.id}-${product.id}`}>
+                        <div className="product-info">
+                          {product.image?.url ? (
+                            <span className="product-thumb">
+                              <img src={product.image.url} alt={product.image.alt || product.name} />
+                            </span>
+                          ) : (
+                            <span className="product-thumb">No img</span>
+                          )}
+                          <div className="product-details">
+                            <p className="admin-request-value">{formatText(product.name)}</p>
+                            <p className="muted">
+                              {formatText(product.category)} · {formatText(product.unit)} ·{' '}
+                              {formatPrice(product.price)} RON
+                            </p>
+                          </div>
+                        </div>
+                        {options.withProductActions && (
+                          <div className="product-actions">
+                            <button
+                              className="button ghost"
+                              type="button"
+                              onClick={() => handleDeleteProduct(product.id)}
+                              disabled={actionStatus.state === 'loading'}
+                            >
+                              Delete product
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                ) : (
+                  <p className="admin-request-value">No products.</p>
+                )}
+              </div>
+            )}
+
             {request.reviewNote && <p className="notice error">Review note: {request.reviewNote}</p>}
 
             {options.withActions && (
@@ -376,14 +489,37 @@ export default function AdminPage() {
                   />
                 </label>
                 <div className="admin-request-actions">
-                  <button className="button secondary" type="button" onClick={() => handleApprove(request.id)}>
+                  <button
+                    className="button secondary"
+                    type="button"
+                    onClick={() => handleApprove(request.id)}
+                    disabled={actionStatus.state === 'loading'}
+                  >
                     Approve
                   </button>
-                  <button className="button ghost" type="button" onClick={() => handleReject(request.id)}>
+                  <button
+                    className="button ghost"
+                    type="button"
+                    onClick={() => handleReject(request.id)}
+                    disabled={actionStatus.state === 'loading'}
+                  >
                     Reject
                   </button>
                 </div>
               </>
+            )}
+
+            {options.withFarmDeleteAction && (
+              <div className="admin-request-actions">
+                <button
+                  className="button ghost"
+                  type="button"
+                  onClick={() => handleDeleteFarm(request.id)}
+                  disabled={actionStatus.state === 'loading'}
+                >
+                  Delete farm and all products
+                </button>
+              </div>
             )}
           </>
         )}
@@ -397,8 +533,8 @@ export default function AdminPage() {
 
   if (sessionStatus !== 'authenticated') {
     return (
-      <div className="page-section">
-        <div className="form-card" style={{ maxWidth: '520px' }}>
+      <div className="page-section admin-login-section">
+        <div className="form-card admin-login-card">
           <h1>Admin login</h1>
           <p className="muted">
             Authenticate with admin credentials to review farmer profile requests.
@@ -462,13 +598,13 @@ export default function AdminPage() {
       <div className="button-group">
         <Link
           className={`button ${activeTab === 'pending' ? 'secondary' : 'ghost'}`}
-          to="/admin/pending"
+          to="/manage-portal/pending"
         >
           Pending requests
         </Link>
         <Link
           className={`button ${activeTab === 'approved' ? 'secondary' : 'ghost'}`}
-          to="/admin/approved"
+          to="/manage-portal/approved"
         >
           Approved requests
         </Link>
@@ -492,7 +628,14 @@ export default function AdminPage() {
           (approvedRequests.length === 0 && requestsStatus.state === 'success' ? (
             <p className="muted">No approved requests yet.</p>
           ) : (
-            <div className="stack">{approvedRequests.map((request) => renderRequestCard(request))}</div>
+            <div className="stack">
+              {approvedRequests.map((request) =>
+                renderRequestCard(request, {
+                  withProductActions: true,
+                  withFarmDeleteAction: true,
+                }),
+              )}
+            </div>
           ))}
       </div>
     </div>

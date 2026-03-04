@@ -24,17 +24,73 @@ import { apiFetch } from './lib/api.js';
 import { AuthProvider, useAuth } from './lib/auth.jsx';
 import { supabase } from './lib/supabase.js';
 
+function FruitsVegIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M12 8c-3 0-5 2.4-5 5.3S9.1 19 12 19s5-2.4 5-5.7S15 8 12 8Z" />
+      <path d="M12 8c0-1.7.8-3.1 2.3-3.8" />
+      <path d="M11.2 6.4c-1.5-.8-3.2-.7-4.2.4" />
+      <path
+        d="M14.7 4.3c1.3-.1 2.5.6 3 1.8-1.4.4-2.5-.2-3-1.8Z"
+        fill="currentColor"
+        stroke="none"
+      />
+    </svg>
+  );
+}
+
+function MeatIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M7 8.8c2.2-1.8 5.8-2.6 8.7-1.1 2 1 3.3 2.9 3.3 5 0 2.9-2.3 5.3-5.2 5.3-1.4 0-2.7-.5-3.8-1.4-.9-.7-1.7-1-2.8-1-1.7 0-3.2-1.4-3.2-3.2 0-1.4.6-2.5 1.6-3.6Z" />
+      <circle cx="11.7" cy="12.2" r="1.5" />
+      <path d="M4.4 15.2 3 16.6m2.9-2.9-1.4 1.4" />
+    </svg>
+  );
+}
+
+function DairyIcon() {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" focusable="false">
+      <path d="M6.5 5h4v2l-.8 1.4v8.8c0 .9-.7 1.6-1.6 1.6H6.9c-.9 0-1.6-.7-1.6-1.6V8.4L6.5 7V5Z" />
+      <path d="M13.2 13.8h7.2l-2.2 4.1h-7.1Z" />
+      <circle cx="16.1" cy="15.4" r="0.6" fill="currentColor" stroke="none" />
+      <circle cx="18" cy="16.7" r="0.5" fill="currentColor" stroke="none" />
+    </svg>
+  );
+}
+
+const MARKET_MENU_ITEMS = [
+  {
+    to: '/markets/fruits_and_vegetables',
+    label: 'Fruits & Vegetables',
+    Icon: FruitsVegIcon,
+  },
+  {
+    to: '/markets/meat',
+    label: 'Meat',
+    Icon: MeatIcon,
+  },
+  {
+    to: '/markets/dairy_products',
+    label: 'Dairy',
+    Icon: DairyIcon,
+  },
+];
+
 function Navigation() {
   const location = useLocation();
   const navigate = useNavigate();
   const { status, user, logout } = useAuth();
   const isAuthRoute = location.pathname.startsWith('/auth/');
   const showLogin = status !== 'authenticated' && !isAuthRoute;
+  const isMarketsRoute = location.pathname.startsWith('/markets');
   const initial = user?.username?.charAt(0)?.toUpperCase() || '?';
   const isChatEnabled =
     status === 'authenticated' &&
     (user?.role === 'customer' || user?.role === 'vendor');
   const [chatUnreadCount, setChatUnreadCount] = useState(0);
+  const [isMarketsMenuOpen, setIsMarketsMenuOpen] = useState(false);
 
   const handleLogout = async () => {
     await logout();
@@ -125,17 +181,38 @@ function Navigation() {
     };
   }, [isChatEnabled, user?.id, user?.role]);
 
+  useEffect(() => {
+    setIsMarketsMenuOpen(false);
+  }, [location.pathname]);
+
   return (
     <nav className="nav">
       <Link className="brand" to="/">
         Local Farmers Collective
       </Link>
       <div className="nav-links">
-        <Link to="/markets/fruits_and_vegetables">Fruits & Vegetables</Link>
-        <Link to="/markets/meat">Meat</Link>
-        <Link to="/markets/dairy_products">Dairy</Link>
+        <div className="nav-market-menu">
+          <button
+            className={`nav-market-toggle ${isMarketsRoute ? 'active' : ''}`}
+            type="button"
+            onClick={() => setIsMarketsMenuOpen((prev) => !prev)}
+          >
+            Markets
+          </button>
+          {isMarketsMenuOpen && (
+            <div className="nav-market-dropdown">
+              {MARKET_MENU_ITEMS.map(({ to, label, Icon }) => (
+                <Link className="nav-market-pill" key={to} to={to}>
+                  <span className="nav-market-pill-icon">
+                    <Icon />
+                  </span>
+                  <span className="nav-market-pill-label">{label}</span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </div>
         <Link to="/farmers">Farmers</Link>
-        <Link to="/admin/pending">Admin</Link>
         {status === 'authenticated' && (
           <Link className="nav-chat-link" to="/chat">
             Chat
@@ -185,7 +262,7 @@ function AppShell() {
           <Route path="/auth/signup" element={<SignupPage />} />
           <Route path="/auth/login" element={<LoginPage />} />
           <Route path="/profile" element={<ProfilePage />} />
-          <Route path="/admin/*" element={<AdminPage />} />
+          <Route path="/manage-portal/*" element={<AdminPage />} />
           <Route path="/farms/:vendorId" element={<VendorPublicProfilePage />} />
           <Route path="/vendor" element={<Navigate to="/profile" replace />} />
           <Route path="/vendor/products_uploaded" element={<VendorProductsPage />} />

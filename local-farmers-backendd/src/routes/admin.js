@@ -1,6 +1,7 @@
 const express = require('express');
 
 const { supabase, TABLES } = require('../lib/supabase');
+const { mapProductToApi } = require('../lib/domain');
 const {
   ADMIN_COOKIE_NAME,
   ADMIN_PASSWORD,
@@ -50,6 +51,19 @@ const FARMER_COLUMNS = [
   'bio',
 ].join(', ');
 
+const PRODUCT_COLUMNS = [
+  'id',
+  'farmer_id',
+  '"product name"',
+  'category',
+  'type',
+  'Unit',
+  'Price',
+  '"photo url"',
+  '"bio check"',
+  'available',
+].join(', ');
+
 const normalizePublicUrls = (images) => {
   if (!Array.isArray(images)) {
     return [];
@@ -70,7 +84,7 @@ const normalizePublicUrls = (images) => {
   return normalized;
 };
 
-const mapRequestMeta = (request, usersById) => {
+const mapRequestMeta = (request, usersById, productsByFarmer = new Map()) => {
   const user = usersById.get(String(request.user_id)) || null;
   return {
     id: String(request.id || ''),
@@ -82,6 +96,7 @@ const mapRequestMeta = (request, usersById) => {
     reviewedBy: request.reviewed_by || '',
     createdAt: request.created_at || null,
     updatedAt: request.updated_at || null,
+    products: productsByFarmer.get(String(request.user_id)) || [],
     payload: {
       farmName: request.farm_name || '',
       displayName: request.display_name || request.farm_name || '',
@@ -191,21 +206,36 @@ router.get('/farmer-requests', requireAdmin, async (_req, res, next) => {
       new Set((requests || []).map((entry) => String(entry.user_id)).filter(Boolean)),
     );
     const usersById = new Map();
+    const productsByFarmer = new Map();
     if (userIds.length > 0) {
-      const { data: users, error: usersError } = await supabase
-        .from(TABLES.users)
-        .select('id, username, email')
-        .in('id', userIds);
+      const [{ data: users, error: usersError }, { data: products, error: productsError }] =
+        await Promise.all([
+          supabase.from(TABLES.users).select('id, username, email').in('id', userIds),
+          supabase.from(TABLES.products).select(PRODUCT_COLUMNS).in('farmer_id', userIds),
+        ]);
+
       if (usersError) {
         return res.status(500).json({ error: usersError.message || 'Unable to load users.' });
+      }
+      if (productsError) {
+        return res.status(500).json({ error: productsError.message || 'Unable to load products.' });
       }
       for (const user of users || []) {
         usersById.set(String(user.id), user);
       }
+      for (const product of products || []) {
+        const farmerId = String(product.farmer_id || '');
+        if (!farmerId) {
+          continue;
+        }
+        const list = productsByFarmer.get(farmerId) || [];
+        list.push(mapProductToApi(product));
+        productsByFarmer.set(farmerId, list);
+      }
     }
 
     return res.json({
-      requests: (requests || []).map((entry) => mapRequestMeta(entry, usersById)),
+      requests: (requests || []).map((entry) => mapRequestMeta(entry, usersById, productsByFarmer)),
     });
   } catch (error) {
     return next(error);
@@ -287,6 +317,97 @@ router.post('/farmer-requests/:requestId/approve', requireAdmin, async (req, res
 
     return res.json({
       request: mapRequestMeta(updatedRequest, usersById),
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.delete('/farmer-requests/:requestId/farm', requireAdmin, async (req, res, next) => {
+  try {
+    const requestId = typeof req.params?.requestId === 'string' ? req.params.requestId.trim() : '';
+    if (!requestId) {
+      return res.status(400).json({ error: 'requestId is required.' });
+    }
+
+    const request = await fetchRequestById(requestId);
+    if (!request) {
+      return res.status(404).json({ error: 'Request not found.' });
+    }
+    if (request.status !== 'approved') {
+      return res.status(400).json({ error: 'Only approved farms can be deleted.' });
+    }
+
+    const farmerId = request.user_id;
+    const { data: deletedProducts, error: deleteProductsError } = await supabase
+      .from(TABLES.products)
+      .delete()
+      .eq('farmer_id', farmerId)
+      .select('id');
+    if (deleteProductsError) {
+      return res.status(500).json({ error: deleteProductsError.message || 'Unable to delete farm products.' });
+    }
+
+    const { error: deleteFarmPhotosError } = await supabase
+      .from(TABLES.farmPhotos)
+      .delete()
+      .eq('farmer_id', farmerId);
+    if (deleteFarmPhotosError) {
+      return res.status(500).json({ error: deleteFarmPhotosError.message || 'Unable to delete farm photos.' });
+    }
+
+    const { error: deleteFarmerError } = await supabase
+      .from(TABLES.farmers)
+      .delete()
+      .eq('id', farmerId);
+    if (deleteFarmerError) {
+      return res.status(500).json({ error: deleteFarmerError.message || 'Unable to delete farm.' });
+    }
+
+    const { error: deleteRequestError } = await supabase
+      .from(TABLES.farmerRequests)
+      .delete()
+      .eq('id', requestId);
+    if (deleteRequestError) {
+      return res.status(500).json({ error: deleteRequestError.message || 'Unable to delete approved request.' });
+    }
+
+    return res.json({
+      deleted: {
+        requestId,
+        farmerId: String(farmerId || ''),
+        products: Array.isArray(deletedProducts) ? deletedProducts.length : 0,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.delete('/products/:productId', requireAdmin, async (req, res, next) => {
+  try {
+    const productId = typeof req.params?.productId === 'string' ? req.params.productId.trim() : '';
+    if (!productId) {
+      return res.status(400).json({ error: 'productId is required.' });
+    }
+
+    const { data: deletedRows, error: deleteError } = await supabase
+      .from(TABLES.products)
+      .delete()
+      .eq('id', productId)
+      .select(PRODUCT_COLUMNS);
+
+    if (deleteError) {
+      return res.status(500).json({ error: deleteError.message || 'Unable to delete product.' });
+    }
+
+    const deletedProduct = Array.isArray(deletedRows) ? deletedRows[0] : null;
+    if (!deletedProduct) {
+      return res.status(404).json({ error: 'Product not found.' });
+    }
+
+    return res.json({
+      product: mapProductToApi(deletedProduct),
     });
   } catch (error) {
     return next(error);

@@ -84,6 +84,97 @@ a {
   align-items: center;
 }
 
+.nav-market-menu {
+  position: relative;
+}
+
+.nav-market-toggle {
+  border: none;
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 400;
+  padding: 0;
+  cursor: pointer;
+}
+
+.nav-market-toggle.active {
+  color: var(--accent-strong);
+}
+
+.nav-market-dropdown {
+  position: absolute;
+  top: calc(100% + 12px);
+  left: 0;
+  z-index: 40;
+  width: 300px;
+  display: grid;
+  gap: 6px;
+  padding: 10px;
+  border-radius: 16px;
+  border: 1px solid rgba(47, 38, 29, 0.12);
+  background: #fdf9f2;
+  box-shadow: 0 22px 36px -28px var(--surface-shadow);
+}
+
+.nav-market-pill {
+  display: flex;
+  align-items: center;
+  justify-content: flex-start;
+  gap: 10px;
+  min-height: 42px;
+  width: 100%;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: transparent;
+  border: none;
+  color: #6a3013;
+  font-weight: 400;
+  box-shadow: none;
+  transition: background 0.16s ease;
+}
+
+.nav-market-pill:hover {
+  background: #f2e2cd;
+}
+
+.nav-market-pill:focus-visible {
+  outline: 2px solid rgba(166, 88, 46, 0.45);
+  outline-offset: 1px;
+  background: #f2e2cd;
+}
+
+.nav-market-pill-icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  flex: 0 0 auto;
+}
+
+.nav-market-pill-icon svg {
+  width: 19px;
+  height: 19px;
+  fill: none;
+  stroke: currentColor;
+  stroke-width: 2.1;
+  stroke-linecap: round;
+  stroke-linejoin: round;
+}
+
+.nav-market-pill-label {
+  text-align: left;
+  width: auto;
+  font-weight: 400;
+}
+
+@media (max-width: 720px) {
+  .nav-market-dropdown {
+    width: min(300px, 92vw);
+  }
+}
+
 .avatar {
   display: inline-flex;
   align-items: center;
@@ -344,6 +435,16 @@ a {
   display: flex;
   flex-direction: column;
   gap: 24px;
+}
+
+.admin-login-section {
+  min-height: clamp(380px, 62vh, 560px);
+  align-items: center;
+  justify-content: center;
+}
+
+.admin-login-card {
+  width: min(520px, 100%);
 }
 
 .auth-section .form-card {
