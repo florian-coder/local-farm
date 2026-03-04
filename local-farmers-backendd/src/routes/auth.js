@@ -18,23 +18,9 @@ const normalizeUsername = (username) => normalizeText(username, 32).toLowerCase(
 
 const isValidRole = (role) => role === 'customer' || role === 'vendor';
 
-const createRoleProfile = async ({ userId, role, username }) => {
+const createRoleProfile = async ({ userId, role }) => {
   if (role === 'vendor') {
-    const { error } = await supabase.from(TABLES.farmers).insert({
-      id: userId,
-      'farm name': `${username} Farm`,
-      'display name': username,
-      'street address': '',
-      'street number': '',
-      city: '',
-      county: '',
-      'phone number': '',
-      email: '',
-      'organic operator certificate': '',
-      'delivery radius': 0,
-      bio: '',
-    });
-    return error;
+    return null;
   }
 
   const { error } = await supabase.from(TABLES.customers).insert({
@@ -117,7 +103,6 @@ router.post('/signup', async (req, res, next) => {
     const profileError = await createRoleProfile({
       userId: insertedUser.id,
       role,
-      username: normalized,
     });
     if (profileError) {
       await supabase.from(TABLES.users).delete().eq('id', insertedUser.id);

@@ -45,6 +45,29 @@ const FARMER_COLUMNS = [
   'bio',
 ].join(', ');
 
+const REQUEST_COLUMNS = [
+  'id',
+  'user_id',
+  'farm_name',
+  'display_name',
+  'street_address',
+  'street_number',
+  'county',
+  'city',
+  'phone_number',
+  'email',
+  'organic_certificate',
+  'delivery_radius_km',
+  'bio',
+  'farm_images',
+  'status',
+  'review_note',
+  'reviewed_at',
+  'reviewed_by',
+  'created_at',
+  'updated_at',
+].join(', ');
+
 const PRODUCT_COLUMNS = [
   'id',
   'farmer_id',
@@ -108,41 +131,17 @@ const fetchFarmerByUserId = async (userId) => {
   return farmer || null;
 };
 
-const createDefaultFarmer = async (user) => {
-  const username = normalizeText(user?.username || 'Farmer', 120) || 'Farmer';
-  const payload = {
-    id: user.id,
-    'farm name': `${username} Farm`,
-    'display name': username,
-    'street address': '',
-    'street number': '',
-    city: '',
-    county: '',
-    'phone number': '',
-    email: user?.email || '',
-    'organic operator certificate': '',
-    'delivery radius': 0,
-    bio: '',
-  };
+const fetchFarmerRequestByUserId = async (userId) => {
+  const { data: request, error } = await supabase
+    .from(TABLES.farmerRequests)
+    .select(REQUEST_COLUMNS)
+    .eq('user_id', userId)
+    .maybeSingle();
 
-  const { data: farmer, error } = await supabase
-    .from(TABLES.farmers)
-    .insert(payload)
-    .select(FARMER_COLUMNS)
-    .single();
-
-  if (error) {
-    throw new Error(error.message || 'Unable to create farmer profile.');
+  if (error && error.code !== 'PGRST116') {
+    throw new Error(error.message || 'Unable to load farmer request.');
   }
-  return farmer;
-};
-
-const ensureFarmerForUser = async (user) => {
-  const existing = await fetchFarmerByUserId(user.id);
-  if (existing) {
-    return existing;
-  }
-  return createDefaultFarmer(user);
+  return request || null;
 };
 
 const fetchFarmPhotos = async (farmerId) => {
@@ -179,9 +178,7 @@ const syncFarmPhotos = async (farmerId, imageUrls) => {
     is_cover: index === 0,
   }));
 
-  const { error: insertError } = await supabase
-    .from(TABLES.farmPhotos)
-    .insert(rows);
+  const { error: insertError } = await supabase.from(TABLES.farmPhotos).insert(rows);
   if (insertError) {
     throw new Error(insertError.message || 'Unable to save farm photos.');
   }
@@ -232,9 +229,7 @@ const uploadToBucket = async ({ bucketNames, uploadPath, file }) => {
     return publicData.publicUrl;
   }
 
-  throw new Error(
-    `Bucket not found. Tried: ${bucketNames.join(', ')}`,
-  );
+  throw new Error(`Bucket not found. Tried: ${bucketNames.join(', ')}`);
 };
 
 const resolveVendorResponse = async (farmer, userEmail) => {
@@ -245,16 +240,87 @@ const resolveVendorResponse = async (farmer, userEmail) => {
   });
 };
 
+const mapRequestToVendorResponse = (request, userEmail = '') => ({
+  id: String(request?.user_id || ''),
+  farmName: request?.farm_name || '',
+  displayName: request?.display_name || request?.farm_name || '',
+  streetAddress: request?.street_address || '',
+  streetNumber: request?.street_number || '',
+  county: request?.county || '',
+  city: request?.city || '',
+  phoneNumber: request?.phone_number || '',
+  email: request?.email || userEmail || '',
+  organicCertificate: request?.organic_certificate || '',
+  deliveryRadiusKm: toNumberOrNull(request?.delivery_radius_km),
+  bio: request?.bio || '',
+  farmImages: normalizePublicUrls(request?.farm_images),
+});
+
+const mapRequestMeta = (request) => {
+  if (!request) {
+    return null;
+  }
+
+  return {
+    id: String(request.id || ''),
+    userId: String(request.user_id || ''),
+    status: request.status || 'pending',
+    reviewNote: request.review_note || '',
+    reviewedAt: request.reviewed_at || null,
+    reviewedBy: request.reviewed_by || '',
+    createdAt: request.created_at || null,
+    updatedAt: request.updated_at || null,
+  };
+};
+
 router.get('/profile', requireVendor, async (req, res, next) => {
   try {
     const userRow = await fetchUserRow(req.user.id);
     const farmer = await fetchFarmerByUserId(req.user.id);
-    if (!farmer) {
-      return res.json({ vendor: null });
+    const request = await fetchFarmerRequestByUserId(req.user.id);
+    const userEmail = userRow?.email || req.user.email || '';
+
+    if (request && request.status !== 'approved') {
+      return res.json({
+        vendor: mapRequestToVendorResponse(request, userEmail),
+        profileApproved: Boolean(farmer),
+        requestStatus: request.status || 'pending',
+        request: mapRequestMeta(request),
+      });
     }
 
-    const vendor = await resolveVendorResponse(farmer, userRow?.email || '');
-    return res.json({ vendor });
+    if (farmer) {
+      const vendor = await resolveVendorResponse(farmer, userEmail);
+      return res.json({
+        vendor,
+        profileApproved: true,
+        requestStatus: request?.status || 'approved',
+        request: mapRequestMeta(request),
+      });
+    }
+
+    if (request) {
+      return res.json({
+        vendor: mapRequestToVendorResponse(request, userEmail),
+        profileApproved: false,
+        requestStatus: request.status || 'pending',
+        request: mapRequestMeta(request),
+      });
+    }
+
+    return res.json({
+      vendor: mapRequestToVendorResponse(
+        {
+          user_id: req.user.id,
+          email: userEmail,
+          farm_images: [],
+        },
+        userEmail,
+      ),
+      profileApproved: false,
+      requestStatus: 'not_submitted',
+      request: null,
+    });
   } catch (error) {
     return next(error);
   }
@@ -273,9 +339,9 @@ router.post('/upload-image', requireVendor, (req, res) => {
         return res.status(400).json({ error: 'No file uploaded.' });
       }
 
-      const farmer = await ensureFarmerForUser(req.user);
+      const ownerId = String(req.user.id);
       const fileName = `${crypto.randomUUID()}${getFileExtension(req.file)}`;
-      const uploadPath = `${farmer.id}/products/${fileName}`;
+      const uploadPath = `${ownerId}/products/${fileName}`;
       const publicUrl = await uploadToBucket({
         bucketNames: BUCKET_ALIASES.productPhotos,
         uploadPath,
@@ -302,11 +368,11 @@ router.post('/upload-farm-images', requireVendor, (req, res) => {
         return res.status(400).json({ error: 'No images uploaded.' });
       }
 
-      const farmer = await ensureFarmerForUser(req.user);
+      const ownerId = String(req.user.id);
       const urls = [];
       for (const file of req.files.slice(0, MAX_PROFILE_IMAGES)) {
         const fileName = `${crypto.randomUUID()}${getFileExtension(file)}`;
-        const uploadPath = `${farmer.id}/gallery/${fileName}`;
+        const uploadPath = `${ownerId}/gallery/${fileName}`;
         const publicUrl = await uploadToBucket({
           bucketNames: BUCKET_ALIASES.farmPhotos,
           uploadPath,
@@ -356,67 +422,50 @@ router.post('/profile', requireVendor, async (req, res, next) => {
       return res.status(400).json({ error: 'deliveryRadiusKm must be a positive number.' });
     }
 
-    const farmerPayload = {
-      'farm name': normalizeText(farmName, 120),
-      'display name':
+    const existingRequest = await fetchFarmerRequestByUserId(req.user.id);
+    const normalizedFarmImages =
+      farmImages !== undefined
+        ? normalizePublicUrls(farmImages)
+        : normalizePublicUrls(existingRequest?.farm_images);
+
+    const requestPayload = {
+      user_id: req.user.id,
+      farm_name: normalizeText(farmName, 120),
+      display_name:
         normalizeText(displayName, 120) || normalizeText(farmName, 120),
-      'street address': normalizeText(streetAddress, 200),
-      'street number': normalizeText(streetNumber, 40),
+      street_address: normalizeText(streetAddress, 200),
+      street_number: normalizeText(streetNumber, 40),
       county: normalizeText(county, 120),
       city: normalizeText(city, 120),
-      'phone number': normalizeText(phoneNumber, 40),
+      phone_number: normalizeText(phoneNumber, 40),
       email: normalizeText(email, 180),
-      'organic operator certificate': normalizeText(organicCertificate, 200),
-      'delivery radius': deliveryRadius,
+      organic_certificate: normalizeText(organicCertificate, 200),
+      delivery_radius_km: deliveryRadius,
       bio: normalizeText(bio, 1000),
+      farm_images: normalizedFarmImages,
+      status: 'pending',
+      review_note: '',
+      reviewed_at: null,
+      reviewed_by: '',
     };
 
-    const existingFarmer = await fetchFarmerByUserId(req.user.id);
-    let farmer = null;
-    if (existingFarmer?.id) {
-      const { data: updatedFarmer, error: updateError } = await supabase
-        .from(TABLES.farmers)
-        .update(farmerPayload)
-        .eq('id', existingFarmer.id)
-        .select(FARMER_COLUMNS)
-        .single();
-      if (updateError) {
-        return res.status(500).json({ error: updateError.message });
-      }
-      farmer = updatedFarmer;
-    } else {
-      const { data: insertedFarmer, error: insertError } = await supabase
-        .from(TABLES.farmers)
-        .insert({
-          id: req.user.id,
-          ...farmerPayload,
-        })
-        .select(FARMER_COLUMNS)
-        .single();
-      if (insertError) {
-        return res.status(500).json({ error: insertError.message });
-      }
-      farmer = insertedFarmer;
+    const { data: requestRow, error: upsertError } = await supabase
+      .from(TABLES.farmerRequests)
+      .upsert(requestPayload, { onConflict: 'user_id' })
+      .select(REQUEST_COLUMNS)
+      .single();
+
+    if (upsertError || !requestRow) {
+      return res.status(500).json({ error: upsertError?.message || 'Unable to save request.' });
     }
 
-    const normalizedEmail = normalizeText(email, 180);
-    if (normalizedEmail) {
-      const { error: userError } = await supabase
-        .from(TABLES.users)
-        .update({ email: normalizedEmail })
-        .eq('id', req.user.id);
-      if (userError) {
-        return res.status(500).json({ error: userError.message });
-      }
-    }
-
-    if (farmImages !== undefined) {
-      const urls = normalizePublicUrls(farmImages);
-      await syncFarmPhotos(farmer.id, urls);
-    }
-
-    const vendor = await resolveVendorResponse(farmer, normalizedEmail || req.user.email || '');
-    return res.json({ vendor });
+    const userRow = await fetchUserRow(req.user.id);
+    return res.json({
+      vendor: mapRequestToVendorResponse(requestRow, userRow?.email || req.user.email || ''),
+      profileApproved: false,
+      requestStatus: requestRow.status || 'pending',
+      request: mapRequestMeta(requestRow),
+    });
   } catch (error) {
     return next(error);
   }

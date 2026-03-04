@@ -78,6 +78,9 @@ const mapVendorToProfile = (vendor) => ({
 export default function VendorPage() {
   const { status: authStatus, user } = useAuth();
   const [profile, setProfile] = useState(initialProfile);
+  const [profileApproved, setProfileApproved] = useState(false);
+  const [requestStatus, setRequestStatus] = useState('not_submitted');
+  const [requestReviewNote, setRequestReviewNote] = useState('');
   const [profileStatus, setProfileStatus] = useState({
     state: 'idle',
     message: '',
@@ -110,8 +113,15 @@ export default function VendorPage() {
         if (!active) {
           return;
         }
+        setProfileApproved(Boolean(data.profileApproved));
+        setRequestStatus(typeof data.requestStatus === 'string' ? data.requestStatus : 'not_submitted');
+        setRequestReviewNote(
+          typeof data?.request?.reviewNote === 'string' ? data.request.reviewNote : '',
+        );
         if (data.vendor) {
           setProfile(mapVendorToProfile(data.vendor));
+        } else {
+          setProfile(initialProfile);
         }
       } catch (error) {
         if (!active) {
@@ -166,6 +176,7 @@ export default function VendorPage() {
       authStatus !== 'authenticated' ||
       !user ||
       user.role !== 'vendor' ||
+      !profileApproved ||
       !profile.id
     ) {
       return;
@@ -196,7 +207,7 @@ export default function VendorPage() {
     return () => {
       supabase.removeChannel(channel);
     };
-  }, [authStatus, user, profile.id]);
+  }, [authStatus, user, profile.id, profileApproved]);
 
   const handleProfileChange = (event) => {
     const { name, value } = event.target;
@@ -224,7 +235,18 @@ export default function VendorPage() {
       if (!response.ok) {
         throw new Error(data.error || 'Unable to save profile.');
       }
-      setProfileStatus({ state: 'success', message: 'Profile saved.' });
+      setProfileApproved(Boolean(data.profileApproved));
+      setRequestStatus(typeof data.requestStatus === 'string' ? data.requestStatus : 'pending');
+      setRequestReviewNote(
+        typeof data?.request?.reviewNote === 'string' ? data.request.reviewNote : '',
+      );
+      setProfileStatus({
+        state: 'success',
+        message:
+          data.profileApproved
+            ? 'Profile saved.'
+            : 'Profile request saved. Waiting for admin approval.',
+      });
       if (data.vendor) {
         setProfile(mapVendorToProfile(data.vendor));
         setFarmUploadStatus({ state: 'idle', message: '' });
@@ -332,6 +354,13 @@ export default function VendorPage() {
 
   const handleProductSubmit = async (event) => {
     event.preventDefault();
+    if (!profileApproved) {
+      setProductStatus({
+        state: 'error',
+        message: 'Your farm profile must be approved before adding products.',
+      });
+      return;
+    }
     setProductStatus({ state: 'loading', message: 'Adding product...' });
 
     try {
@@ -392,6 +421,13 @@ export default function VendorPage() {
     if (!productId) {
       return;
     }
+    if (!profileApproved) {
+      setProductStatus({
+        state: 'error',
+        message: 'Your farm profile must be approved before managing products.',
+      });
+      return;
+    }
     const confirmed = window.confirm('Delete this product?');
     if (!confirmed) {
       return;
@@ -434,15 +470,24 @@ export default function VendorPage() {
     );
   }
 
+  const effectiveProfileStatus =
+    requestStatus === 'pending' || requestStatus === 'rejected'
+      ? requestStatus
+      : profileApproved
+        ? 'approved'
+        : requestStatus;
+
   return (
     <div className="page-section">
       <div className="section-header">
         <div>
           <h1>Vendor dashboard</h1>
-          <p className="muted">Welcome back, {user.username}.</p>
+          <p className="muted">
+            Welcome back, {user.username}. Profile status: {effectiveProfileStatus}.
+          </p>
         </div>
         <div className="button-group">
-          {profile.id && (
+          {profileApproved && profile.id && (
             <Link className="button ghost" to={`/farms/${profile.id}`}>
               View public page
             </Link>
@@ -452,6 +497,25 @@ export default function VendorPage() {
           </Link>
         </div>
       </div>
+
+      {!profileApproved && (
+        <p className="notice">
+          Your farm profile is not approved yet. Save profile submits/updates a request in admin review queue.
+          Products become available after approval.
+        </p>
+      )}
+      {profileApproved && requestStatus === 'pending' && (
+        <p className="notice">
+          You already have an approved profile. Your latest changes are pending admin approval.
+        </p>
+      )}
+      {requestStatus === 'rejected' && (
+        <p className="notice error">
+          Your latest profile request was rejected.
+          {requestReviewNote ? ` Reason: ${requestReviewNote}` : ''}
+          {' '}Update details and save again to resubmit.
+        </p>
+      )}
 
       <div className="vendor-grid">
         <form className="form-card" onSubmit={handleProfileSubmit}>

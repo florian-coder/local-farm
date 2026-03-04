@@ -26,6 +26,7 @@ const TABLES = {
   customers: 'customers',
   products: 'products',
   farmPhotos: 'farm_photos',
+  farmerRequests: 'farmer_requests',
   conversations: 'conversations',
   messages: 'messages',
 };

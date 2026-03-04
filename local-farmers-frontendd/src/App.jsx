@@ -19,6 +19,7 @@ import ProfilePage from './pages/ProfilePage.jsx';
 import VendorPublicProfilePage from './pages/VendorPublicProfilePage.jsx';
 import VendorProductsPage from './pages/VendorProductsPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
+import AdminPage from './pages/AdminPage.jsx';
 import { apiFetch } from './lib/api.js';
 import { AuthProvider, useAuth } from './lib/auth.jsx';
 import { supabase } from './lib/supabase.js';
@@ -134,6 +135,7 @@ function Navigation() {
         <Link to="/markets/meat">Meat</Link>
         <Link to="/markets/dairy_products">Dairy</Link>
         <Link to="/farmers">Farmers</Link>
+        <Link to="/admin/pending">Admin</Link>
         {status === 'authenticated' && (
           <Link className="nav-chat-link" to="/chat">
             Chat
@@ -183,6 +185,7 @@ function AppShell() {
           <Route path="/auth/signup" element={<SignupPage />} />
           <Route path="/auth/login" element={<LoginPage />} />
           <Route path="/profile" element={<ProfilePage />} />
+          <Route path="/admin/*" element={<AdminPage />} />
           <Route path="/farms/:vendorId" element={<VendorPublicProfilePage />} />
           <Route path="/vendor" element={<Navigate to="/profile" replace />} />
           <Route path="/vendor/products_uploaded" element={<VendorProductsPage />} />
