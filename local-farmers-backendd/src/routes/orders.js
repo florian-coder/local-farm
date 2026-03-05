@@ -1,0 +1,729 @@
+const express = require('express');
+
+const { requireAuth } = require('../middleware/auth');
+const { supabase, TABLES } = require('../lib/supabase');
+
+const router = express.Router();
+
+const MAX_REPLY_LENGTH = 1200;
+
+const ORDER_COLUMNS = [
+  'id',
+  'farmer_id',
+  'client_id',
+  'order_state',
+  'total_price',
+  'created_at',
+  'updated_at',
+].join(', ');
+
+const ORDER_ITEM_COLUMNS = [
+  'id',
+  'order_id',
+  'product_id',
+  'product_name',
+  'product_unit',
+  'quantity',
+  'unit_price',
+  'line_total',
+  'created_at',
+  'updated_at',
+].join(', ');
+
+const ORDER_REPLY_COLUMNS = [
+  'id',
+  'order_id',
+  'sender_user_id',
+  'message',
+  'created_at',
+].join(', ');
+
+const PRODUCT_COLUMNS = [
+  'id',
+  'farmer_id',
+  '"product name"',
+  'Unit',
+  'Price',
+  'available',
+  'instant_buy',
+].join(', ');
+
+const ORDER_STATES = [
+  'placed_order',
+  'pending_order',
+  'received_by_farmer',
+  'preparing_order',
+  'in_transit',
+  'arrived',
+  'received',
+];
+
+const PENDING_STATES = ['placed_order', 'pending_order'];
+const ACTIVE_STATES = ['received_by_farmer', 'preparing_order', 'in_transit', 'arrived'];
+const HISTORY_STATES = ['received'];
+
+const ORDER_BUCKETS = {
+  pending: PENDING_STATES,
+  active: ACTIVE_STATES,
+  history: HISTORY_STATES,
+};
+
+const ALLOWED_TRANSITIONS = {
+  customer: {
+    placed_order: [{ nextState: 'pending_order', label: 'Place order' }],
+    arrived: [{ nextState: 'received', label: 'Confirm received' }],
+  },
+  vendor: {
+    pending_order: [{ nextState: 'received_by_farmer', label: 'Accept order' }],
+    received_by_farmer: [{ nextState: 'preparing_order', label: 'Preparing order' }],
+    preparing_order: [{ nextState: 'in_transit', label: 'In transit' }],
+    in_transit: [{ nextState: 'arrived', label: 'Arrived' }],
+  },
+};
+
+const resolveArray = (value) => (Array.isArray(value) ? value : []);
+
+const normalizeIdentifier = (value) => {
+  if (value === null || value === undefined) {
+    return '';
+  }
+  return String(value).trim();
+};
+
+const normalizeReplyText = (value) => {
+  if (typeof value !== 'string') {
+    return '';
+  }
+  return value.trim().slice(0, MAX_REPLY_LENGTH);
+};
+
+const toNumber = (value, fallback = 0) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return fallback;
+  }
+  return parsed;
+};
+
+const normalizeQuantity = (value) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed) || parsed <= 0) {
+    return null;
+  }
+  return Number(parsed.toFixed(2));
+};
+
+const formatMoney = (value) => Number(toNumber(value, 0).toFixed(2));
+
+const toPartnerForCustomer = (order, farmersById) => {
+  const farmer = farmersById.get(order.farmerId) || null;
+  return {
+    id: order.farmerId,
+    role: 'vendor',
+    title: farmer?.farmName || farmer?.displayName || 'Farmer',
+    subtitle: [farmer?.city, farmer?.county].filter(Boolean).join(', '),
+  };
+};
+
+const toPartnerForVendor = (order, usersById, customersById) => {
+  const user = usersById.get(order.clientId) || null;
+  const customer = customersById.get(order.clientId) || null;
+  const customerName = [customer?.name, customer?.surname]
+    .filter(Boolean)
+    .join(' ')
+    .trim();
+
+  return {
+    id: order.clientId,
+    role: 'customer',
+    title: customerName || user?.username || 'Customer',
+    subtitle: [customer?.city, customer?.county].filter(Boolean).join(', '),
+  };
+};
+
+const mapOrderRow = (row) => ({
+  id: normalizeIdentifier(row.id),
+  farmerId: normalizeIdentifier(row.farmer_id),
+  clientId: normalizeIdentifier(row.client_id),
+  orderState: row.order_state || 'placed_order',
+  totalPrice: formatMoney(row.total_price),
+  createdAt: row.created_at || null,
+  updatedAt: row.updated_at || null,
+});
+
+const mapOrderItemRow = (row) => ({
+  id: normalizeIdentifier(row.id),
+  orderId: normalizeIdentifier(row.order_id),
+  productId: normalizeIdentifier(row.product_id),
+  productName: row.product_name || '',
+  productUnit: row.product_unit || '',
+  quantity: toNumber(row.quantity, 0),
+  unitPrice: formatMoney(row.unit_price),
+  lineTotal: formatMoney(row.line_total),
+  createdAt: row.created_at || null,
+  updatedAt: row.updated_at || null,
+});
+
+const mapOrderReplyRow = (row) => ({
+  id: normalizeIdentifier(row.id),
+  orderId: normalizeIdentifier(row.order_id),
+  senderUserId: normalizeIdentifier(row.sender_user_id),
+  message: row.message || '',
+  createdAt: row.created_at || null,
+});
+
+const selectRowsByIds = async (table, columns, idColumn, ids, errorMessage) => {
+  const filteredIds = resolveArray(ids)
+    .map((value) => normalizeIdentifier(value))
+    .filter(Boolean);
+
+  if (filteredIds.length === 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase
+    .from(table)
+    .select(columns)
+    .in(idColumn, filteredIds);
+
+  if (error) {
+    throw new Error(error.message || errorMessage);
+  }
+  return resolveArray(data);
+};
+
+const fetchVendorRecord = async (userId) => {
+  const { data: farmer, error } = await supabase
+    .from(TABLES.farmers)
+    .select('id, "farm name", "display name", city, county')
+    .eq('id', userId)
+    .maybeSingle();
+
+  if (error && error.code !== 'PGRST116') {
+    throw new Error(error.message || 'Unable to load vendor profile.');
+  }
+
+  return farmer || null;
+};
+
+const canAccessOrder = (user, vendorRecord, order) => {
+  if (!user || !order) {
+    return false;
+  }
+
+  if (user.role === 'customer') {
+    return order.clientId === normalizeIdentifier(user.id);
+  }
+
+  if (user.role === 'vendor') {
+    return Boolean(vendorRecord && order.farmerId === normalizeIdentifier(vendorRecord.id));
+  }
+
+  return false;
+};
+
+const resolveAllowedActions = (role, orderState) => {
+  const roleActions = ALLOWED_TRANSITIONS[role] || {};
+  return resolveArray(roleActions[orderState]).map((entry) => ({
+    nextState: entry.nextState,
+    label: entry.label,
+  }));
+};
+
+const fetchOrdersByStates = async ({ user, vendorRecord, states }) => {
+  const safeStates = resolveArray(states).filter((state) => ORDER_STATES.includes(state));
+  if (safeStates.length === 0) {
+    return [];
+  }
+
+  let query = supabase
+    .from(TABLES.orders)
+    .select(ORDER_COLUMNS)
+    .in('order_state', safeStates);
+
+  if (user.role === 'customer') {
+    query = query.eq('client_id', user.id);
+  } else if (user.role === 'vendor') {
+    if (!vendorRecord) {
+      return [];
+    }
+    query = query.eq('farmer_id', vendorRecord.id);
+  } else {
+    return [];
+  }
+
+  const { data, error } = await query
+    .order('updated_at', { ascending: false })
+    .order('created_at', { ascending: false });
+
+  if (error) {
+    throw new Error(error.message || 'Unable to load orders.');
+  }
+
+  return resolveArray(data).map(mapOrderRow);
+};
+
+const fetchOrderById = async (orderId) => {
+  const id = normalizeIdentifier(orderId);
+  if (!id) {
+    return null;
+  }
+
+  const { data, error } = await supabase
+    .from(TABLES.orders)
+    .select(ORDER_COLUMNS)
+    .eq('id', id)
+    .maybeSingle();
+
+  if (error) {
+    throw new Error(error.message || 'Unable to load order.');
+  }
+  if (!data) {
+    return null;
+  }
+  return mapOrderRow(data);
+};
+
+const fetchOrderDetails = async ({ orders, user }) => {
+  const orderList = resolveArray(orders);
+  if (orderList.length === 0) {
+    return [];
+  }
+
+  const orderIds = orderList.map((entry) => entry.id);
+  const farmerIds = [...new Set(orderList.map((entry) => entry.farmerId).filter(Boolean))];
+  const clientIds = [...new Set(orderList.map((entry) => entry.clientId).filter(Boolean))];
+
+  const [itemsRows, repliesRows, usersRows, customersRows, farmersRows] = await Promise.all([
+    selectRowsByIds(
+      TABLES.orderItems,
+      ORDER_ITEM_COLUMNS,
+      'order_id',
+      orderIds,
+      'Unable to load order items.',
+    ),
+    selectRowsByIds(
+      TABLES.orderReplies,
+      ORDER_REPLY_COLUMNS,
+      'order_id',
+      orderIds,
+      'Unable to load order replies.',
+    ),
+    selectRowsByIds(
+      TABLES.users,
+      'id, username, email',
+      'id',
+      clientIds,
+      'Unable to load users.',
+    ),
+    selectRowsByIds(
+      TABLES.customers,
+      'id, name, surname, city, county',
+      'id',
+      clientIds,
+      'Unable to load customers.',
+    ),
+    selectRowsByIds(
+      TABLES.farmers,
+      'id, "farm name", "display name", city, county',
+      'id',
+      farmerIds,
+      'Unable to load farmers.',
+    ),
+  ]);
+
+  const itemsByOrderId = new Map();
+  for (const item of resolveArray(itemsRows).map(mapOrderItemRow)) {
+    const list = itemsByOrderId.get(item.orderId) || [];
+    list.push(item);
+    itemsByOrderId.set(item.orderId, list);
+  }
+
+  const repliesByOrderId = new Map();
+  for (const reply of resolveArray(repliesRows).map(mapOrderReplyRow)) {
+    const list = repliesByOrderId.get(reply.orderId) || [];
+    list.push(reply);
+    repliesByOrderId.set(reply.orderId, list);
+  }
+  for (const [orderId, replies] of repliesByOrderId.entries()) {
+    replies.sort((a, b) => {
+      const left = Date.parse(a.createdAt || '') || 0;
+      const right = Date.parse(b.createdAt || '') || 0;
+      return left - right;
+    });
+    repliesByOrderId.set(orderId, replies);
+  }
+
+  const usersById = new Map(
+    resolveArray(usersRows).map((entry) => [normalizeIdentifier(entry.id), entry]),
+  );
+  const customersById = new Map(
+    resolveArray(customersRows).map((entry) => [normalizeIdentifier(entry.id), entry]),
+  );
+  const farmersById = new Map(
+    resolveArray(farmersRows).map((entry) => [
+      normalizeIdentifier(entry.id),
+      {
+        id: normalizeIdentifier(entry.id),
+        farmName: entry['farm name'] || '',
+        displayName: entry['display name'] || '',
+        city: entry.city || '',
+        county: entry.county || '',
+      },
+    ]),
+  );
+
+  return orderList.map((order) => {
+    const partner =
+      user.role === 'customer'
+        ? toPartnerForCustomer(order, farmersById)
+        : toPartnerForVendor(order, usersById, customersById);
+
+    const customer = customersById.get(order.clientId) || null;
+    const customerUser = usersById.get(order.clientId) || null;
+    const customerName = [customer?.name, customer?.surname]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
+    const customerTitle = customerName || customerUser?.username || 'Customer';
+    const farmerTitle =
+      farmersById.get(order.farmerId)?.farmName ||
+      farmersById.get(order.farmerId)?.displayName ||
+      'Farmer';
+
+    const replies = (repliesByOrderId.get(order.id) || []).map((reply) => ({
+      id: reply.id,
+      senderUserId: reply.senderUserId,
+      senderName:
+        reply.senderUserId === order.farmerId
+          ? farmerTitle
+          : reply.senderUserId === order.clientId
+            ? customerTitle
+            : usersById.get(reply.senderUserId)?.username || 'User',
+      message: reply.message,
+      createdAt: reply.createdAt,
+      isOwn: reply.senderUserId === normalizeIdentifier(user.id),
+    }));
+
+    const items = (itemsByOrderId.get(order.id) || [])
+      .slice()
+      .sort((a, b) => {
+        const left = Date.parse(a.createdAt || '') || 0;
+        const right = Date.parse(b.createdAt || '') || 0;
+        return left - right;
+      })
+      .map((item) => ({
+        id: item.id,
+        productId: item.productId,
+        productName: item.productName,
+        productUnit: item.productUnit,
+        quantity: item.quantity,
+        unitPrice: item.unitPrice,
+        lineTotal: item.lineTotal,
+      }));
+
+    return {
+      id: order.id,
+      farmerId: order.farmerId,
+      clientId: order.clientId,
+      orderState: order.orderState,
+      totalPrice: order.totalPrice,
+      createdAt: order.createdAt,
+      updatedAt: order.updatedAt,
+      partner,
+      items,
+      replies,
+      allowedActions: resolveAllowedActions(user.role, order.orderState),
+    };
+  });
+};
+
+const fetchDetailedOrder = async ({ orderId, user, vendorRecord }) => {
+  const order = await fetchOrderById(orderId);
+  if (!order) {
+    return null;
+  }
+  if (!canAccessOrder(user, vendorRecord, order)) {
+    return null;
+  }
+
+  const details = await fetchOrderDetails({ orders: [order], user });
+  return details[0] || null;
+};
+
+const requireCustomer = (req, res) => {
+  if (req.user.role !== 'customer') {
+    res.status(403).json({ error: 'Only customer accounts can place cart orders.' });
+    return false;
+  }
+  return true;
+};
+
+router.get('/', requireAuth, async (req, res, next) => {
+  try {
+    const bucketRaw = normalizeIdentifier(req.query.bucket || 'pending').toLowerCase();
+    const bucket = bucketRaw || 'pending';
+    const states = ORDER_BUCKETS[bucket];
+
+    if (!states) {
+      return res.status(400).json({ error: 'bucket must be pending, active, or history.' });
+    }
+
+    const vendorRecord =
+      req.user.role === 'vendor' ? await fetchVendorRecord(req.user.id) : null;
+    const orders = await fetchOrdersByStates({
+      user: req.user,
+      vendorRecord,
+      states,
+    });
+    const detailedOrders = await fetchOrderDetails({
+      orders,
+      user: req.user,
+    });
+
+    return res.json({
+      bucket,
+      orders: detailedOrders,
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/cart/items', requireAuth, async (req, res, next) => {
+  try {
+    if (!requireCustomer(req, res)) {
+      return null;
+    }
+
+    const productId = normalizeIdentifier(req.body?.productId);
+    const quantity = normalizeQuantity(req.body?.quantity ?? 1);
+
+    if (!productId) {
+      return res.status(400).json({ error: 'productId is required.' });
+    }
+    if (quantity === null) {
+      return res.status(400).json({ error: 'quantity must be a positive number.' });
+    }
+
+    const { data: product, error: productError } = await supabase
+      .from(TABLES.products)
+      .select(PRODUCT_COLUMNS)
+      .eq('id', productId)
+      .maybeSingle();
+    if (productError) {
+      return res.status(500).json({ error: productError.message || 'Unable to load product.' });
+    }
+    if (!product) {
+      return res.status(404).json({ error: 'Product not found.' });
+    }
+    if (!product.instant_buy) {
+      return res.status(400).json({
+        error: 'This product is inquiry-only. Use Send inquiry to contact the farmer.',
+      });
+    }
+
+    const isAvailable = product.available === true || Number(product.available) === 1;
+    if (!isAvailable) {
+      return res.status(400).json({ error: 'Product is not available right now.' });
+    }
+
+    const farmerId = normalizeIdentifier(product.farmer_id);
+    if (!farmerId) {
+      return res.status(400).json({ error: 'Product does not have a valid farmer.' });
+    }
+
+    const { data: openOrders, error: openOrderError } = await supabase
+      .from(TABLES.orders)
+      .select(ORDER_COLUMNS)
+      .eq('client_id', req.user.id)
+      .eq('farmer_id', farmerId)
+      .eq('order_state', 'placed_order')
+      .order('created_at', { ascending: false })
+      .limit(1);
+
+    if (openOrderError) {
+      return res
+        .status(500)
+        .json({ error: openOrderError.message || 'Unable to load cart order.' });
+    }
+
+    let orderRow = resolveArray(openOrders).map(mapOrderRow)[0] || null;
+    if (!orderRow) {
+      const { data: insertedOrder, error: insertOrderError } = await supabase
+        .from(TABLES.orders)
+        .insert({
+          farmer_id: farmerId,
+          client_id: req.user.id,
+          order_state: 'placed_order',
+        })
+        .select(ORDER_COLUMNS)
+        .single();
+
+      if (insertOrderError || !insertedOrder) {
+        return res.status(500).json({
+          error: insertOrderError?.message || 'Unable to create cart order.',
+        });
+      }
+      orderRow = mapOrderRow(insertedOrder);
+    }
+
+    const { data: existingItem, error: existingItemError } = await supabase
+      .from(TABLES.orderItems)
+      .select(ORDER_ITEM_COLUMNS)
+      .eq('order_id', orderRow.id)
+      .eq('product_id', productId)
+      .maybeSingle();
+
+    if (existingItemError && existingItemError.code !== 'PGRST116') {
+      return res.status(500).json({
+        error: existingItemError.message || 'Unable to load existing cart item.',
+      });
+    }
+
+    const previousQuantity = toNumber(existingItem?.quantity, 0);
+    const nextQuantity = Number((previousQuantity + quantity).toFixed(2));
+    const unitPrice = formatMoney(product.Price);
+
+    const upsertPayload = {
+      order_id: orderRow.id,
+      product_id: productId,
+      product_name: product['product name'] || '',
+      product_unit: product.Unit || 'unit',
+      quantity: nextQuantity,
+      unit_price: unitPrice,
+    };
+
+    const { error: upsertItemError } = await supabase
+      .from(TABLES.orderItems)
+      .upsert(upsertPayload, { onConflict: 'order_id,product_id' });
+    if (upsertItemError) {
+      return res
+        .status(500)
+        .json({ error: upsertItemError.message || 'Unable to update cart item.' });
+    }
+
+    const vendorRecord = null;
+    const detailedOrder = await fetchDetailedOrder({
+      orderId: orderRow.id,
+      user: req.user,
+      vendorRecord,
+    });
+
+    return res.status(201).json({
+      order: detailedOrder,
+      addedProduct: {
+        id: productId,
+        name: product['product name'] || '',
+        quantityAdded: quantity,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.patch('/:orderId/state', requireAuth, async (req, res, next) => {
+  try {
+    const orderId = normalizeIdentifier(req.params.orderId);
+    const nextState = normalizeIdentifier(req.body?.nextState);
+
+    if (!orderId) {
+      return res.status(400).json({ error: 'orderId is required.' });
+    }
+    if (!ORDER_STATES.includes(nextState)) {
+      return res.status(400).json({ error: 'Invalid nextState.' });
+    }
+
+    const vendorRecord =
+      req.user.role === 'vendor' ? await fetchVendorRecord(req.user.id) : null;
+    const order = await fetchOrderById(orderId);
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found.' });
+    }
+    if (!canAccessOrder(req.user, vendorRecord, order)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const allowedActions = resolveAllowedActions(req.user.role, order.orderState);
+    const canTransition = allowedActions.some((entry) => entry.nextState === nextState);
+    if (!canTransition) {
+      return res.status(400).json({
+        error: `Transition from ${order.orderState} to ${nextState} is not allowed.`,
+      });
+    }
+
+    const { error: updateError } = await supabase
+      .from(TABLES.orders)
+      .update({ order_state: nextState })
+      .eq('id', orderId);
+    if (updateError) {
+      return res.status(500).json({ error: updateError.message || 'Unable to update order.' });
+    }
+
+    const detailedOrder = await fetchDetailedOrder({
+      orderId,
+      user: req.user,
+      vendorRecord,
+    });
+    return res.json({
+      order: detailedOrder,
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+router.post('/:orderId/replies', requireAuth, async (req, res, next) => {
+  try {
+    const orderId = normalizeIdentifier(req.params.orderId);
+    const message = normalizeReplyText(req.body?.message);
+
+    if (!orderId) {
+      return res.status(400).json({ error: 'orderId is required.' });
+    }
+    if (!message) {
+      return res.status(400).json({ error: 'message is required.' });
+    }
+
+    const vendorRecord =
+      req.user.role === 'vendor' ? await fetchVendorRecord(req.user.id) : null;
+    const order = await fetchOrderById(orderId);
+    if (!order) {
+      return res.status(404).json({ error: 'Order not found.' });
+    }
+    if (!canAccessOrder(req.user, vendorRecord, order)) {
+      return res.status(403).json({ error: 'Forbidden' });
+    }
+
+    const { data: insertedReply, error: insertReplyError } = await supabase
+      .from(TABLES.orderReplies)
+      .insert({
+        order_id: orderId,
+        sender_user_id: req.user.id,
+        message,
+      })
+      .select(ORDER_REPLY_COLUMNS)
+      .single();
+
+    if (insertReplyError || !insertedReply) {
+      return res.status(500).json({
+        error: insertReplyError?.message || 'Unable to add order reply.',
+      });
+    }
+
+    return res.status(201).json({
+      reply: {
+        id: normalizeIdentifier(insertedReply.id),
+        orderId: normalizeIdentifier(insertedReply.order_id),
+        senderUserId: normalizeIdentifier(insertedReply.sender_user_id),
+        message: insertedReply.message || '',
+        createdAt: insertedReply.created_at || null,
+      },
+    });
+  } catch (error) {
+    return next(error);
+  }
+});
+
+module.exports = router;

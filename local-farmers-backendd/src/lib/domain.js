@@ -116,6 +116,7 @@ const mapProductToApi = (product, vendor = null) => ({
   rating: 4,
   available: toBooleanAvailability(product.available),
   isBio: toBooleanAvailability(product['bio check']),
+  instantBuy: Boolean(product.instant_buy),
   image: mapProductImage(product['product name'], product['photo url']),
   vendor,
 });

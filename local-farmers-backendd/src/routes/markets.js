@@ -29,6 +29,7 @@ const PRODUCT_COLUMNS = [
   '"photo url"',
   '"bio check"',
   'available',
+  'instant_buy',
 ].join(', ');
 
 const FARMER_COLUMNS = [

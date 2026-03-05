@@ -29,6 +29,9 @@ const TABLES = {
   farmerRequests: 'farmer_requests',
   conversations: 'conversations',
   messages: 'messages',
+  orders: 'orders',
+  orderItems: 'order_items',
+  orderReplies: 'order_replies',
 };
 
 const dedupe = (values) => {

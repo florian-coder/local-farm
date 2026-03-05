@@ -20,6 +20,7 @@ import VendorPublicProfilePage from './pages/VendorPublicProfilePage.jsx';
 import VendorProductsPage from './pages/VendorProductsPage.jsx';
 import NotFoundPage from './pages/NotFoundPage.jsx';
 import AdminPage from './pages/AdminPage.jsx';
+import OrdersPage from './pages/OrdersPage.jsx';
 import { apiFetch } from './lib/api.js';
 import { AuthProvider, useAuth } from './lib/auth.jsx';
 import { supabase } from './lib/supabase.js';
@@ -221,6 +222,7 @@ function Navigation() {
             )}
           </Link>
         )}
+        {status === 'authenticated' && <Link to="/orders">Orders</Link>}
         <Link to="/profile">Profile</Link>
         {status === 'authenticated' && user?.role === 'vendor' && (
           <Link to="/vendor/products_uploaded">My Products</Link>
@@ -258,6 +260,7 @@ function AppShell() {
           />
           <Route path="/farmers" element={<FarmersPage />} />
           <Route path="/chat" element={<ChatPage />} />
+          <Route path="/orders" element={<OrdersPage />} />
           <Route path="/markets/:category" element={<MarketsPage />} />
           <Route path="/auth/signup" element={<SignupPage />} />
           <Route path="/auth/login" element={<LoginPage />} />

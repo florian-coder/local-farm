@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { Link, useParams } from 'react-router-dom';
+import { Link, useNavigate, useParams } from 'react-router-dom';
 
 import {
   apiFetch,
@@ -8,6 +8,7 @@ import {
   resolveUploadUrl,
 } from '../lib/api.js';
 import { getQualityLabel } from '../lib/quality.js';
+import { useAuth } from '../lib/auth.jsx';
 
 const initialState = {
   status: 'loading',
@@ -17,9 +18,12 @@ const initialState = {
 
 export default function MarketsPage() {
   const { category } = useParams();
+  const navigate = useNavigate();
+  const { user } = useAuth();
   const [state, setState] = useState(initialState);
   const [productImages, setProductImages] = useState({});
   const requestedImagesRef = useRef(new Set());
+  const [cartFeedback, setCartFeedback] = useState({});
 
   // Search and filter state
   const [searchQuery, setSearchQuery] = useState('');
@@ -172,6 +176,59 @@ export default function MarketsPage() {
       const matchesRating = product.rating >= parseFloat(minRating);
       return matchesSearch && matchesBio && matchesPrice && matchesRating;
     });
+  };
+
+  const setFeedbackForProduct = (productId, status, message) => {
+    if (!productId) {
+      return;
+    }
+    setCartFeedback((prev) => ({
+      ...prev,
+      [productId]: {
+        status,
+        message,
+      },
+    }));
+  };
+
+  const handleAddToCart = async (product) => {
+    if (!product?.id) {
+      return;
+    }
+    if (!user) {
+      navigate('/auth/login');
+      return;
+    }
+    if (user.role !== 'customer') {
+      setFeedbackForProduct(product.id, 'error', 'Only customers can add products to cart.');
+      return;
+    }
+    if (!product.instantBuy) {
+      setFeedbackForProduct(product.id, 'error', 'Instant buy is disabled for this product. Use Send inquiry.');
+      return;
+    }
+
+    setFeedbackForProduct(product.id, 'loading', 'Adding to cart...');
+    try {
+      const response = await apiFetch('/api/orders/cart/items', {
+        method: 'POST',
+        body: JSON.stringify({
+          productId: product.id,
+          quantity: 1,
+        }),
+      });
+      const data = await response.json();
+      if (!response.ok) {
+        throw new Error(data.error || 'Unable to add product to cart.');
+      }
+      setFeedbackForProduct(product.id, 'success', 'Added to cart.');
+    } catch (error) {
+      setFeedbackForProduct(
+        product.id,
+        'error',
+        error.message || 'Unable to add product to cart.',
+      );
+    }
   };
 
   return (
@@ -385,12 +442,37 @@ export default function MarketsPage() {
                                               : 'Rating N/A'}
                                           </div>
                                           {product.vendor?.id && (
-                                            <Link
-                                              className="button ghost small market-chat-link"
-                                              to={`/chat?vendorId=${product.vendor.id}`}
+                                            <div className="button-group">
+                                              <Link
+                                                className="button ghost small market-chat-link"
+                                                to={`/chat?vendorId=${product.vendor.id}`}
+                                              >
+                                                Send inquiry
+                                              </Link>
+                                              <button
+                                                className="button secondary small market-cart-button"
+                                                type="button"
+                                                disabled={!product.instantBuy}
+                                                onClick={() => handleAddToCart(product)}
+                                              >
+                                                {product.instantBuy
+                                                  ? 'Add to cart'
+                                                  : 'Inquiry only'}
+                                              </button>
+                                            </div>
+                                          )}
+                                          {cartFeedback[product.id]?.message && (
+                                            <p
+                                              className={`notice ${
+                                                cartFeedback[product.id]?.status === 'error'
+                                                  ? 'error'
+                                                  : cartFeedback[product.id]?.status === 'success'
+                                                    ? 'success'
+                                                    : ''
+                                              }`}
                                             >
-                                              Contact farmer
-                                            </Link>
+                                              {cartFeedback[product.id].message}
+                                            </p>
                                           )}
                                           {resolvedImage?.photographer &&
                                             resolvedImage?.photoUrl &&

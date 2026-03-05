@@ -15,6 +15,7 @@ const marketsRouter = require('./routes/markets');
 const externalRouter = require('./routes/external');
 const productsRouter = require('./routes/products');
 const adminRouter = require('./routes/admin');
+const ordersRouter = require('./routes/orders');
 const { purgeLegacyState } = require('./lib/legacyCleanup');
 
 const app = express();
@@ -70,6 +71,7 @@ app.use('/api/markets', marketsRouter);
 app.use('/api/external', externalRouter);
 app.use('/api/products', productsRouter);
 app.use('/api/admin', adminRouter);
+app.use('/api/orders', ordersRouter);
 
 app.use((req, res) => {
   res.status(404).json({ error: 'Not Found' });

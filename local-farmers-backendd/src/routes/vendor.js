@@ -79,6 +79,7 @@ const PRODUCT_COLUMNS = [
   '"photo url"',
   '"bio check"',
   'available',
+  'instant_buy',
 ].join(', ');
 
 const normalizePublicUrls = (images) => {
@@ -497,7 +498,18 @@ router.get('/products', requireVendor, async (req, res, next) => {
 
 router.post('/products', requireVendor, async (req, res, next) => {
   try {
-    const { name, category, unit, available, rating, isBio, price, type, imageUrl } =
+    const {
+      name,
+      category,
+      unit,
+      available,
+      rating,
+      isBio,
+      instantBuy,
+      price,
+      type,
+      imageUrl,
+    } =
       req.body || {};
     if (!name || typeof name !== 'string') {
       return res.status(400).json({ error: 'name is required.' });
@@ -529,6 +541,7 @@ router.post('/products', requireVendor, async (req, res, next) => {
       Price: Number(priceValue.toFixed(2)),
       available: toIntFlag(available !== false),
       'bio check': toIntFlag(Boolean(isBio)),
+      instant_buy: Boolean(instantBuy),
       'photo url': typeof imageUrl === 'string' && imageUrl.trim() ? imageUrl.trim() : null,
     };
 

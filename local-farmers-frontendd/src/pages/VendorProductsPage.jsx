@@ -192,6 +192,7 @@ export default function VendorProductsPage() {
                         ·{' '}
                         {product.rating ? `Rating ${product.rating}/5` : 'Rating N/A'}
                         {product.isBio ? ' · Bio Verified' : ' · Conventional'}
+                        {product.instantBuy ? ' · Instant buy' : ' · Inquiry only'}
                       </p>
                       {isUpload ? (
                         <span className="badge ghost">Uploaded photo</span>
@@ -225,6 +226,9 @@ export default function VendorProductsPage() {
                   <div className="product-actions">
                     <span className={product.available ? 'badge' : 'badge ghost'}>
                       {product.available ? 'Available' : 'Unavailable'}
+                    </span>
+                    <span className={product.instantBuy ? 'badge' : 'badge ghost'}>
+                      {product.instantBuy ? 'Instant buy' : 'Inquiry only'}
                     </span>
                     <button
                       className="button ghost small"

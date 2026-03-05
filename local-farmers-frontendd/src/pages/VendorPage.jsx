@@ -32,6 +32,7 @@ const initialProduct = {
   available: true,
   rating: 4.0,
   isBio: false,
+  instantBuy: false,
   photo: null,
 };
 
@@ -829,6 +830,15 @@ export default function VendorPage() {
                 onChange={handleProductChange}
               />
               Available now
+            </label>
+            <label className="field checkbox">
+              <input
+                type="checkbox"
+                name="instantBuy"
+                checked={productForm.instantBuy}
+                onChange={handleProductChange}
+              />
+              Instant buy enabled (allows Add to cart)
             </label>
             <div className="form-actions">
               <button

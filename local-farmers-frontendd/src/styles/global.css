@@ -1273,6 +1273,104 @@ a {
   border-radius: 18px;
 }
 
+.orders-tabs {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  margin-bottom: 16px;
+}
+
+.orders-list {
+  display: grid;
+  gap: 12px;
+}
+
+.order-card {
+  display: grid;
+  gap: 10px;
+}
+
+.order-card-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 12px;
+}
+
+.order-card-header h2 {
+  margin: 0;
+}
+
+.order-card-header p {
+  margin: 4px 0 0;
+}
+
+.order-badge-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  justify-content: flex-end;
+}
+
+.order-items ul {
+  margin: 8px 0 0;
+  padding-left: 18px;
+  display: grid;
+  gap: 4px;
+}
+
+.order-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.order-replies {
+  display: grid;
+  gap: 8px;
+}
+
+.order-replies-list {
+  display: grid;
+  gap: 8px;
+  max-height: 240px;
+  overflow-y: auto;
+  padding-right: 4px;
+}
+
+.order-reply-item {
+  border: 1px solid rgba(47, 38, 29, 0.1);
+  border-radius: 12px;
+  padding: 8px 10px;
+  background: #fffdf9;
+}
+
+.order-reply-item.own {
+  background: #fef0df;
+  border-color: rgba(201, 125, 76, 0.3);
+}
+
+.order-reply-item p {
+  margin: 0;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+
+.order-reply-meta {
+  font-size: 0.8rem;
+  color: var(--ink-muted);
+  margin-bottom: 4px;
+}
+
+.order-reply-form {
+  display: grid;
+  gap: 8px;
+}
+
+.market-cart-button {
+  margin-top: 8px;
+}
+
 @media (min-width: 900px) {
   .hero {
     grid-template-columns: 1.1fr 0.9fr;
