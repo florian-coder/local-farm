@@ -1,301 +1,450 @@
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Link } from 'react-router-dom';
 
-import { apiFetch, getApiBase } from '../lib/api.js';
-import { getQualityLabel } from '../lib/quality.js';
+import { apiFetch, resolveImageUrl } from '../lib/api.js';
 
-const initialStatus = {
-  state: 'idle',
-  label: 'API status not checked',
-  checkedAt: null,
-};
+const HERO_IMAGE_URL =
+  'https://images.pexels.com/photos/841303/pexels-photo-841303.jpeg';
 
-const fallbackSignals = [
-  { label: 'Open farm stands', value: '0' },
-  { label: 'Active growers', value: '0' },
-  { label: 'Pickup points', value: '0' },
+const CATEGORY_TABS = [
+  { key: 'fruits_and_vegetables', label: 'Fruits & Vegetables' },
+  { key: 'meat', label: 'Meat' },
+  { key: 'dairy_products', label: 'Dairy' },
 ];
 
+const FALLBACK_RECOMMENDATIONS = {
+  fruits_and_vegetables: {
+    category: 'fruits_and_vegetables',
+    label: 'Fruits & Vegetables',
+    products: [
+      {
+        id: 'fallback-fv-1',
+        name: 'Heritage Tomatoes',
+        price: 5.4,
+        unit: 'kg',
+        isBio: true,
+        vendorName: 'Riverside Green Farm',
+        image: null,
+      },
+      {
+        id: 'fallback-fv-2',
+        name: 'Carrots',
+        price: 3.2,
+        unit: 'kg',
+        isBio: true,
+        vendorName: 'Garden Patch Co-op',
+        image: null,
+      },
+    ],
+  },
+  dairy_products: {
+    category: 'dairy_products',
+    label: 'Dairy',
+    products: [
+      {
+        id: 'fallback-dairy-1',
+        name: 'Farmhouse Yogurt',
+        price: 4.8,
+        unit: 'jar',
+        isBio: true,
+        vendorName: 'Morning Meadow Dairy',
+        image: null,
+      },
+      {
+        id: 'fallback-dairy-2',
+        name: 'Raw Milk Cheese',
+        price: 7.9,
+        unit: 'piece',
+        isBio: false,
+        vendorName: 'Alpine Milk Works',
+        image: null,
+      },
+    ],
+  },
+  meat: {
+    category: 'meat',
+    label: 'Meat',
+    products: [
+      {
+        id: 'fallback-meat-1',
+        name: 'Grass-Fed Beef Cuts',
+        price: 14.5,
+        unit: 'kg',
+        isBio: true,
+        vendorName: 'Oakfield Ranch',
+        image: null,
+      },
+      {
+        id: 'fallback-meat-2',
+        name: 'Free-Range Chicken',
+        price: 10.2,
+        unit: 'kg',
+        isBio: true,
+        vendorName: 'Hilltop Poultry',
+        image: null,
+      },
+    ],
+  },
+};
+
+const FAQ_ITEMS = [
+  {
+    question: 'Who is it for?',
+    answer:
+      'For Customers: People who want real, healthy food and want to avoid the complexity of modern grocery stores. For Farmers: Local producers in Europe who want to increase their reach and keep a 95% share of their sales.',
+  },
+  {
+    question: 'What is this platform?',
+    answer:
+      'It is a direct link between local farmers and people who want fresh food without contaminants.',
+  },
+  {
+    question: 'Why use this instead of a supermarket?',
+    answer: 'Supermarkets prioritize shelf-life; we prioritize quality.',
+  },
+  {
+    question: 'Is it easy to use?',
+    answer:
+      "Yes. We made it simple and obvious so you don't have to deal with the complexity of a supermarket.",
+  },
+  {
+    question: 'Who runs this?',
+    answer:
+      'A two-person team that wants only the best opportunities for their people. :)',
+  },
+  {
+    question: 'Why buy here instead of a store?',
+    answer:
+      'Store products are often old and treated with chemicals to stay on shelves. Here, you get fresh meat, vegetables, and fruit directly from the farm.',
+  },
+  {
+    question: 'How do I know the food is clean?',
+    answer:
+      'Our focus is on farmers who avoid growth hormones and pesticides, giving you a healthier alternative to industrial food.',
+  },
+  {
+    question: 'Is it expensive?',
+    answer:
+      'By removing middlemen, we keep prices fair for you while ensuring the farmer makes a better profit.',
+  },
+  {
+    question: 'How much does it cost to sell?',
+    answer:
+      'We take a simple 5% commission on each sale. You keep 95% of your earnings.',
+  },
+  {
+    question: 'Why is this better than selling to big retail?',
+    answer:
+      'Big supermarkets often squeeze your margins. On our site, you have the chance to make more money and reach more people directly.',
+  },
+  {
+    question: 'Who handles the technology?',
+    answer:
+      'We do. Our team writes all the code internally, so we can fix issues or add features quickly.',
+  },
+  {
+    question: 'How do I start?',
+    answer:
+      `Just create a farmer account. It's a direct process with no "storytelling" or complicated preamble.`,
+  },
+  {
+    question: 'Is my data safe?',
+    answer:
+      'Yes. We use secure authentication, strict access controls, and rapid in-house updates when issues are found.',
+  },
+];
+
+const DEFAULT_FARMER_OF_MONTH = CATEGORY_TABS.map((entry) => ({
+  category: entry.key,
+  categoryLabel: entry.label,
+  winner: null,
+}));
+
+const formatPrice = (value) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return '$0.00';
+  }
+  return `$${parsed.toFixed(2)}`;
+};
+
 export default function LandingPage() {
-  const apiBase = useMemo(() => getApiBase(), []);
-  const [status, setStatus] = useState(initialStatus);
-  const [marketState, setMarketState] = useState({
-    status: 'loading',
-    markets: [],
-  });
-  const [heroPhoto, setHeroPhoto] = useState(null);
+  const [homeState, setHomeState] = useState({ status: 'loading', data: null });
+  const [activeTab, setActiveTab] = useState(CATEGORY_TABS[0].key);
+  const [openFaqIndex, setOpenFaqIndex] = useState(0);
 
-  const runHealthCheck = useCallback(async (signal) => {
-    setStatus({
-      state: 'loading',
-      label: 'Checking API connectivity',
-      checkedAt: null,
+  useEffect(() => {
+    let active = true;
+
+    const loadHomeInsights = async () => {
+      try {
+        const response = await apiFetch('/api/markets/home-insights', { method: 'GET' });
+        if (!response.ok) {
+          throw new Error('Failed to load homepage insights.');
+        }
+        const data = await response.json();
+        if (!active) {
+          return;
+        }
+        setHomeState({ status: 'success', data });
+      } catch (error) {
+        if (!active) {
+          return;
+        }
+        setHomeState({ status: 'error', data: null });
+      }
+    };
+
+    loadHomeInsights();
+
+    return () => {
+      active = false;
+    };
+  }, []);
+
+  const recommendationsByCategory = useMemo(() => {
+    const fromApi = homeState.data?.dailyRecommendations;
+
+    return Object.fromEntries(
+      CATEGORY_TABS.map((entry) => {
+        const apiEntry =
+          fromApi && typeof fromApi === 'object' ? fromApi[entry.key] : null;
+        const safeProducts = Array.isArray(apiEntry?.products)
+          ? apiEntry.products
+          : FALLBACK_RECOMMENDATIONS[entry.key].products;
+
+        return [
+          entry.key,
+          {
+            category: entry.key,
+            label: apiEntry?.label || entry.label,
+            products: safeProducts,
+          },
+        ];
+      }),
+    );
+  }, [homeState.data]);
+
+  const activeRecommendationProducts =
+    recommendationsByCategory[activeTab]?.products || [];
+
+  const farmerOfMonthCards = useMemo(() => {
+    const apiCategories = homeState.data?.farmerOfMonth?.categories;
+    const apiByCategory = new Map(
+      (Array.isArray(apiCategories) ? apiCategories : []).map((entry) => [
+        entry.category,
+        entry,
+      ]),
+    );
+
+    return DEFAULT_FARMER_OF_MONTH.map((entry) => {
+      const apiEntry = apiByCategory.get(entry.category);
+      return {
+        category: entry.category,
+        categoryLabel: apiEntry?.categoryLabel || entry.categoryLabel,
+        winner: apiEntry?.winner || null,
+      };
     });
+  }, [homeState.data]);
 
-    try {
-      const response = await apiFetch('/api/health', { signal, method: 'GET' });
-      if (!response.ok) {
-        throw new Error(`API error: ${response.status}`);
-      }
-
-      const data = await response.json();
-      const label = data.status === 'ok' ? 'API online' : 'API degraded';
-
-      setStatus({
-        state: 'ok',
-        label,
-        checkedAt: new Date().toLocaleTimeString(),
-      });
-    } catch (error) {
-      if (signal?.aborted) {
-        return;
-      }
-
-      setStatus({
-        state: 'error',
-        label: 'API offline',
-        checkedAt: new Date().toLocaleTimeString(),
-      });
-    }
-  }, []);
-
-  useEffect(() => {
-    const controller = new AbortController();
-    runHealthCheck(controller.signal);
-    return () => controller.abort();
-  }, [runHealthCheck]);
-
-  useEffect(() => {
-    let active = true;
-
-    const loadMarkets = async () => {
-      try {
-        const response = await apiFetch('/api/markets', { method: 'GET' });
-        if (!response.ok) {
-          throw new Error('Failed to load markets.');
-        }
-        const data = await response.json();
-        if (!active) {
-          return;
-        }
-        setMarketState({ status: 'success', markets: data.markets || [] });
-      } catch (error) {
-        if (!active) {
-          return;
-        }
-        setMarketState({ status: 'error', markets: [] });
-      }
-    };
-
-    loadMarkets();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  useEffect(() => {
-    let active = true;
-
-    const loadPhoto = async () => {
-      try {
-        const query = encodeURIComponent('farmers market');
-        const response = await apiFetch(`/api/external/pexels?q=${query}`);
-        if (!response.ok) {
-          return;
-        }
-        const data = await response.json();
-        const photo = data?.photos?.[0];
-        if (!active || !photo) {
-          return;
-        }
-        setHeroPhoto(photo);
-      } catch (error) {
-        if (!active) {
-          return;
-        }
-        setHeroPhoto(null);
-      }
-    };
-
-    loadPhoto();
-
-    return () => {
-      active = false;
-    };
-  }, []);
-
-  const handleRefresh = () => {
-    const controller = new AbortController();
-    runHealthCheck(controller.signal);
-  };
-
-  const statusClass =
-    status.state === 'ok'
-      ? 'status status-ok'
-      : status.state === 'error'
-      ? 'status status-error'
-      : 'status status-loading';
-
-  const primaryMarket = marketState.markets[0];
-  const totalSignals = marketState.markets.reduce(
-    (acc, market) => ({
-      openStands: acc.openStands + (market.openStands || 0),
-      activeGrowers: acc.activeGrowers + (market.activeGrowers || 0),
-      pickupPoints: acc.pickupPoints + (market.pickupPoints || 0),
-    }),
-    { openStands: 0, activeGrowers: 0, pickupPoints: 0 },
-  );
-
-  const communitySignals = marketState.markets.length
-    ? [
-        { label: 'Open farm stands', value: String(totalSignals.openStands) },
-        { label: 'Active growers', value: String(totalSignals.activeGrowers) },
-        { label: 'Pickup points', value: String(totalSignals.pickupPoints) },
-      ]
-    : fallbackSignals;
-
-  const soilLabel = getQualityLabel(primaryMarket?.soil?.qualityScore);
-  const soilScore = primaryMarket?.soil?.qualityScore ?? 'N/A';
-  const marketNews = primaryMarket?.marketNews || [];
+  const farmerOfMonthMeta = homeState.data?.farmerOfMonth || null;
+  const isLiveInsights = homeState.status === 'success';
 
   return (
     <>
-      <header className="hero">
-        <div className="hero-content">
-          <p className="eyebrow">Seasonal, traceable, neighbor-grown</p>
-          <h1>Local Farmers Collective</h1>
+      <header className="landing-hero">
+        <div className="landing-hero-content">
+          <p className="eyebrow">Local Farmers Collective</p>
+          <h1>
+            healthy people need appreciated farmers, we&apos;re here to look out
+            for both
+          </h1>
           <p className="lead">
-            A curated network for fresh produce, transparent supply, and direct
-            connections between growers and customers.
+            Our people deserve the best, and so do our farmers!
           </p>
           <div className="cta-row">
             <Link className="button primary" to="/markets">
-              Browse markets
+              Discover markets
             </Link>
             <Link className="button ghost" to="/auth/signup?role=vendor">
-              Become a vendor
+              Start selling
             </Link>
           </div>
         </div>
-        <div className="hero-card">
-          <div className={statusClass} aria-live="polite">
-            {status.label}
-          </div>
-          <p className="muted">API base: {apiBase}</p>
-          <p className="muted">
-            {status.checkedAt
-              ? `Last checked at ${status.checkedAt}`
-              : 'Running first health check'}
-          </p>
-          <button
-            className="button secondary"
-            type="button"
-            onClick={handleRefresh}
-            disabled={status.state === 'loading'}
-          >
-            {status.state === 'loading' ? 'Checking...' : 'Refresh status'}
-          </button>
-          <div
-            className="hero-photo"
-            style={
-              heroPhoto?.src?.large
-                ? { backgroundImage: `url(${heroPhoto.src.large})` }
-                : undefined
-            }
-          >
-            {!heroPhoto && <span className="photo-fallback">Market view</span>}
-          </div>
-          {heroPhoto?.photographer && heroPhoto?.url && (
-            <p className="muted photo-credit">
-              Photo by{' '}
-              <a
-                href={heroPhoto.photographer_url || heroPhoto.url}
-                target="_blank"
-                rel="noreferrer"
-              >
-                {heroPhoto.photographer}
-              </a>{' '}
-              on{' '}
-              <a href={heroPhoto.url} target="_blank" rel="noreferrer">
-                Pexels
-              </a>
-            </p>
-          )}
+        <div className="landing-hero-visual">
+          <img
+            src={HERO_IMAGE_URL}
+            alt="Cultivated agricultural field"
+            loading="eager"
+          />
         </div>
       </header>
 
-      <section className="grid" id="markets">
-        {communitySignals.map((signal) => (
-          <article className="card" key={signal.label}>
-            <p className="card-value">{signal.value}</p>
-            <p className="card-label">{signal.label}</p>
-          </article>
-        ))}
-      </section>
-
-      <section className="split">
-        <div>
-          <h2>Today&apos;s market pulse</h2>
+      <section className="landing-section">
+        <div className="landing-section-head">
+          <h2>Daily Recommendations</h2>
           <p className="muted">
-            Real-time pricing and soil health estimates for the leading market.
+            {isLiveInsights
+              ? 'Fresh picks based on live marketplace activity.'
+              : 'Showing curated picks while live insights are loading.'}
           </p>
-          <div className="signal-card">
-            <p className="label">Soil quality estimate</p>
-            <p className="value">
-              {soilLabel} ({soilScore})
-            </p>
-            <p className="muted">
-              pH {primaryMarket?.soil?.ph ?? '--'} · Organic carbon{' '}
-              {primaryMarket?.soil?.organicCarbon ?? '--'}
-            </p>
-          </div>
         </div>
-        <div className="stack">
-          {marketNews.length === 0 && (
-            <article className="list-card">
-              <h3>No market updates yet</h3>
-              <p className="muted">Pricing insights will appear once available.</p>
-            </article>
-          )}
-          {marketNews.slice(0, 3).map((news, index) => (
-            <article
-              className="list-card"
-              key={news.commodity}
-              style={{ '--delay': `${index * 120}ms` }}
+        <div className="recommendation-tabs" role="tablist" aria-label="Daily categories">
+          {CATEGORY_TABS.map((entry) => (
+            <button
+              key={entry.key}
+              id={`tab-${entry.key}`}
+              className={`recommendation-tab ${activeTab === entry.key ? 'active' : ''}`}
+              type="button"
+              role="tab"
+              aria-selected={activeTab === entry.key}
+              aria-controls={`tabpanel-${entry.key}`}
+              onClick={() => setActiveTab(entry.key)}
             >
-              <h3>{news.commodity}</h3>
-              <p className="muted">{news.headline}</p>
-              <p className="muted">
-                ${news.priceRange?.min ?? '--'} - ${news.priceRange?.max ?? '--'}{' '}
-                {news.priceRange?.unit || ''}
-              </p>
-            </article>
+              {entry.label}
+            </button>
           ))}
         </div>
+        <div
+          className="recommendation-grid"
+          id={`tabpanel-${activeTab}`}
+          role="tabpanel"
+          aria-labelledby={`tab-${activeTab}`}
+        >
+          {activeRecommendationProducts.map((product, index) => {
+            const resolvedImage = resolveImageUrl(product.image?.url);
+            return (
+              <article
+                className="recommendation-card"
+                key={`${activeTab}-${product.id || index}`}
+                style={{ '--delay': `${index * 90}ms` }}
+              >
+                <div className="recommendation-media">
+                  {resolvedImage ? (
+                    <img
+                      src={resolvedImage}
+                      alt={product.image?.alt || `${product.name} photo`}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <span>Farm Pick</span>
+                  )}
+                </div>
+                <div className="recommendation-body">
+                  <h3>{product.name}</h3>
+                  <p className="muted">{product.vendorName || 'Local farmer'}</p>
+                  <p className="recommendation-price">
+                    {formatPrice(product.price)} / {product.unit || 'unit'}
+                  </p>
+                  <span className="badge">
+                    {product.isBio ? 'Bio-conscious' : 'Traditional craft'}
+                  </span>
+                </div>
+              </article>
+            );
+          })}
+          {activeRecommendationProducts.length === 0 && (
+            <article className="recommendation-empty">
+              <h3>No recommendations yet</h3>
+              <p className="muted">
+                Products for this category will appear as soon as inventory is
+                published.
+              </p>
+            </article>
+          )}
+        </div>
       </section>
 
-      <section className="panel" id="partners">
-        <div>
-          <h2>Built for grower success</h2>
-          <p>
-            Manage pickups, send updates to loyal customers, and keep product
-            availability synchronized across channels.
+      <section className="landing-section">
+        <div className="landing-section-head">
+          <h2>Farmer of the Month</h2>
+          <p className="muted">
+            Each category winner is selected automatically from this month&apos;s
+            numbers.
           </p>
+          {farmerOfMonthMeta?.month && (
+            <p className="muted">Scoring month: {farmerOfMonthMeta.month}</p>
+          )}
         </div>
-        <div className="panel-grid">
-          <div>
-            <p className="panel-label">Response time</p>
-            <p className="panel-value">&lt; 2 hours</p>
-          </div>
-          <div>
-            <p className="panel-label">Order accuracy</p>
-            <p className="panel-value">98%</p>
-          </div>
-          <div>
-            <p className="panel-label">Pickup windows</p>
-            <p className="panel-value">3 per day</p>
-          </div>
+        <div className="certificate-grid">
+          {farmerOfMonthCards.map((entry, index) => {
+            const winner = entry.winner;
+            const winnerPhoto = resolveImageUrl(winner?.photoUrl);
+            return (
+              <article
+                className="certificate-card"
+                key={entry.category}
+                style={{ '--delay': `${index * 120}ms` }}
+              >
+                <p className="certificate-seal">{entry.categoryLabel}</p>
+                <div className="certificate-photo">
+                  {winnerPhoto ? (
+                    <img
+                      src={winnerPhoto}
+                      alt={`${winner?.farmerName || 'Farmer'} portrait`}
+                      loading="lazy"
+                    />
+                  ) : (
+                    <span>Pending</span>
+                  )}
+                </div>
+                <p className="certificate-name">
+                  {winner?.farmerName || 'No winner registered yet'}
+                </p>
+                <p className="certificate-farm">
+                  {winner?.farmName || 'Awaiting completed monthly sales data'}
+                </p>
+                {winner && (
+                  <div className="certificate-metrics">
+                    <p>Revenue: {formatPrice(winner.metrics?.revenue)}</p>
+                    <p>Orders: {winner.metrics?.orders || 0}</p>
+                    <p>Quantity: {winner.metrics?.quantity || 0}</p>
+                    <p>Coefficient: {winner.coefficient || 0}</p>
+                  </div>
+                )}
+              </article>
+            );
+          })}
+        </div>
+      </section>
+
+      <section className="landing-section faq-section">
+        <div className="landing-section-head">
+          <h2>FAQ</h2>
+          <p className="muted">Click any question to open the answer.</p>
+        </div>
+        <div className="faq-list">
+          {FAQ_ITEMS.map((item, index) => (
+            <article
+              className={`faq-item ${openFaqIndex === index ? 'open' : ''}`}
+              key={item.question}
+            >
+              <button
+                className="faq-trigger"
+                type="button"
+                aria-expanded={openFaqIndex === index}
+                aria-controls={`faq-panel-${index}`}
+                id={`faq-trigger-${index}`}
+                onClick={() =>
+                  setOpenFaqIndex((previous) => (previous === index ? -1 : index))
+                }
+              >
+                <span>{item.question}</span>
+                <span className="faq-indicator" aria-hidden="true">
+                  {openFaqIndex === index ? '-' : '+'}
+                </span>
+              </button>
+              <div
+                className="faq-panel"
+                id={`faq-panel-${index}`}
+                role="region"
+                aria-labelledby={`faq-trigger-${index}`}
+                hidden={openFaqIndex !== index}
+              >
+                <p>{item.answer}</p>
+              </div>
+            </article>
+          ))}
         </div>
       </section>
     </>

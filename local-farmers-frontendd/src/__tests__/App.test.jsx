@@ -1,5 +1,5 @@
-import { render, screen } from '@testing-library/react';
-import { beforeEach, afterEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render, screen } from '@testing-library/react';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import App from '../App.jsx';
 
@@ -10,13 +10,6 @@ describe('App', () => {
       vi.fn((input) => {
         const url = typeof input === 'string' ? input : input.url;
 
-        if (url.includes('/api/health')) {
-          return Promise.resolve({
-            ok: true,
-            json: () => Promise.resolve({ status: 'ok' }),
-          });
-        }
-
         if (url.includes('/api/auth/me')) {
           return Promise.resolve({
             ok: false,
@@ -25,47 +18,86 @@ describe('App', () => {
           });
         }
 
-        if (url.includes('/api/markets')) {
+        if (url.includes('/api/markets/home-insights')) {
           return Promise.resolve({
             ok: true,
             json: () =>
               Promise.resolve({
-                markets: [
-                  {
-                    id: 'm1',
-                    name: 'Central Market',
-                    openStands: 12,
-                    activeGrowers: 48,
-                    pickupPoints: 7,
-                    soil: { qualityScore: 72, ph: 6.4, organicCarbon: 12 },
-                    marketNews: [
+                generatedAt: '2026-03-05T10:00:00.000Z',
+                dailyRecommendations: {
+                  fruits_and_vegetables: {
+                    category: 'fruits_and_vegetables',
+                    label: 'Fruits & Vegetables',
+                    products: [
                       {
-                        commodity: 'tomatoes',
-                        headline: 'Seasonal supply tightening',
-                        priceRange: { min: 1.2, max: 2.4, unit: 'USD/lb' },
+                        id: 'fv-1',
+                        name: 'Sunny Tomatoes',
+                        price: 5.2,
+                        unit: 'kg',
+                        isBio: true,
+                        vendorName: 'Green Farm',
+                        image: null,
                       },
                     ],
-                    globalStats: { item: 'Tomatoes', series: [{ year: 2021, value: 118 }] },
-                    products: [],
                   },
-                ],
-              }),
-          });
-        }
-
-        if (url.includes('/api/external/pexels')) {
-          return Promise.resolve({
-            ok: true,
-            json: () =>
-              Promise.resolve({
-                photos: [
-                  {
-                    id: 1,
-                    alt: 'Farmers market',
-                    photographer: 'Test',
-                    src: { large: 'https://example.com/photo.jpg' },
+                  dairy_products: {
+                    category: 'dairy_products',
+                    label: 'Dairy',
+                    products: [
+                      {
+                        id: 'd-1',
+                        name: 'Village Cheese',
+                        price: 7.1,
+                        unit: 'piece',
+                        isBio: false,
+                        vendorName: 'Milk Works',
+                        image: null,
+                      },
+                    ],
                   },
-                ],
+                  meat: {
+                    category: 'meat',
+                    label: 'Meat',
+                    products: [
+                      {
+                        id: 'm-1',
+                        name: 'Pasture Beef',
+                        price: 14.3,
+                        unit: 'kg',
+                        isBio: true,
+                        vendorName: 'Oak Ranch',
+                        image: null,
+                      },
+                    ],
+                  },
+                },
+                farmerOfMonth: {
+                  month: '2026-03',
+                  weights: { revenue: 0.5, orders: 0.3, quantity: 0.2 },
+                  categories: [
+                    {
+                      category: 'meat',
+                      categoryLabel: 'Meat',
+                      winner: {
+                        farmerId: 'f1',
+                        farmerName: 'Alex Pop',
+                        farmName: 'Oak Ranch',
+                        metrics: { revenue: 1200, orders: 40, quantity: 230 },
+                        coefficient: 94.2,
+                      },
+                    },
+                    {
+                      category: 'fruits_and_vegetables',
+                      categoryLabel: 'Fruits & Vegetables',
+                      winner: null,
+                    },
+                    {
+                      category: 'dairy_products',
+                      categoryLabel: 'Dairy',
+                      winner: null,
+                    },
+                  ],
+                },
               }),
           });
         }
@@ -82,17 +114,34 @@ describe('App', () => {
     vi.unstubAllGlobals();
   });
 
-  it('renders the hero headline', () => {
+  it('renders the redesigned hero headline', () => {
     render(<App />);
 
     expect(
-      screen.getByRole('heading', { name: /local farmers collective/i })
+      screen.getByRole('heading', {
+        name: /healthy people need appreciated farmers, we're here to look out for both/i,
+      }),
     ).toBeInTheDocument();
   });
 
-  it('shows API status after health check', async () => {
+  it('switches daily recommendations when changing tabs', async () => {
     render(<App />);
 
-    expect(await screen.findByText(/api online/i)).toBeInTheDocument();
+    expect(await screen.findByText(/sunny tomatoes/i)).toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole('tab', { name: /meat/i }));
+
+    expect(await screen.findByText(/pasture beef/i)).toBeInTheDocument();
+  });
+
+  it('expands FAQ answers in accordion mode', async () => {
+    render(<App />);
+
+    const trigger = await screen.findByRole('button', { name: /who runs this\?/i });
+    fireEvent.click(trigger);
+
+    expect(
+      screen.getByText(/a two-person team that wants only the best opportunities/i),
+    ).toBeInTheDocument();
   });
 });
