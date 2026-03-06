@@ -12,6 +12,7 @@ const {
   toIntFlag,
   toNumberOrNull,
 } = require('../lib/domain');
+const { recalculateAndPersistProductRatings } = require('../lib/productRating');
 
 const router = express.Router();
 
@@ -75,7 +76,9 @@ const PRODUCT_COLUMNS = [
   'category',
   'type',
   'Unit',
+  'quantity',
   'Price',
+  'rating',
   '"photo url"',
   '"bio check"',
   'available',
@@ -503,9 +506,9 @@ router.post('/products', requireVendor, async (req, res, next) => {
       category,
       unit,
       available,
-      rating,
       isBio,
       instantBuy,
+      quantity,
       price,
       type,
       imageUrl,
@@ -515,16 +518,13 @@ router.post('/products', requireVendor, async (req, res, next) => {
       return res.status(400).json({ error: 'name is required.' });
     }
 
-    if (rating !== undefined) {
-      const ratingValue = Number(rating);
-      if (!Number.isFinite(ratingValue) || ratingValue < 1 || ratingValue > 5) {
-        return res.status(400).json({ error: 'rating must be between 1 and 5.' });
-      }
-    }
-
     const priceValue = Number(price);
     if (!Number.isFinite(priceValue) || priceValue < 0) {
       return res.status(400).json({ error: 'price must be a positive number.' });
+    }
+    const quantityValue = Number(quantity);
+    if (!Number.isFinite(quantityValue) || quantityValue < 0) {
+      return res.status(400).json({ error: 'quantity must be a positive number or zero.' });
     }
 
     const farmer = await fetchFarmerByUserId(req.user.id);
@@ -538,6 +538,7 @@ router.post('/products', requireVendor, async (req, res, next) => {
       category: normalizeText(category, 80) || 'fruits_and_vegetables',
       type: normalizeText(type, 80),
       Unit: normalizeText(unit, 40) || 'unit',
+      quantity: Number(quantityValue.toFixed(2)),
       Price: Number(priceValue.toFixed(2)),
       available: toIntFlag(available !== false),
       'bio check': toIntFlag(Boolean(isBio)),
@@ -555,7 +556,25 @@ router.post('/products', requireVendor, async (req, res, next) => {
       return res.status(500).json({ error: insertError.message });
     }
 
-    return res.status(201).json({ product: mapProductToApi(insertedProduct) });
+    try {
+      await recalculateAndPersistProductRatings({ supabase, tables: TABLES });
+    } catch (ratingError) {
+      console.error(
+        '[ratings] Unable to recalculate product ratings after product insert:',
+        ratingError,
+      );
+    }
+
+    const { data: refreshedProduct, error: refreshedError } = await supabase
+      .from(TABLES.products)
+      .select(PRODUCT_COLUMNS)
+      .eq('id', insertedProduct.id)
+      .maybeSingle();
+
+    const responseProduct =
+      !refreshedError && refreshedProduct ? refreshedProduct : insertedProduct;
+
+    return res.status(201).json({ product: mapProductToApi(responseProduct) });
   } catch (error) {
     return next(error);
   }
@@ -587,6 +606,15 @@ router.delete('/products/:productId', requireVendor, async (req, res, next) => {
     const deletedProduct = Array.isArray(deletedRows) ? deletedRows[0] : null;
     if (!deletedProduct) {
       return res.status(404).json({ error: 'Product not found.' });
+    }
+
+    try {
+      await recalculateAndPersistProductRatings({ supabase, tables: TABLES });
+    } catch (ratingError) {
+      console.error(
+        '[ratings] Unable to recalculate product ratings after product delete:',
+        ratingError,
+      );
     }
 
     return res.json({ product: mapProductToApi(deletedProduct) });

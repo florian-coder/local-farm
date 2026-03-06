@@ -36,6 +36,17 @@ const formatValue = (value) => {
   return String(value);
 };
 
+const formatQuantity = (value) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return 'N/A';
+  }
+  if (Number.isInteger(parsed)) {
+    return String(parsed);
+  }
+  return parsed.toFixed(2).replace(/\.?0+$/, '');
+};
+
 export default function VendorPublicProfilePage() {
   const { vendorId } = useParams();
   const navigate = useNavigate();
@@ -257,13 +268,14 @@ export default function VendorPublicProfilePage() {
                         {product.type ? ` (${product.type})` : ''}
                       </p>
                       <p className="muted">
-                        {toLabel(product.category)} · {product.unit || 'unit'} ·{' '}
+                        {toLabel(product.category)} · Qty: {formatQuantity(product.quantity)}{' '}
+                        {product.unit || 'unit'} ·{' '}
                         {product.price !== null && product.price !== undefined
                           ? `$${product.price}`
                           : 'Price N/A'}
                       </p>
                       <p className="muted">
-                        {product.rating ? `Rating ${product.rating}/5` : 'Rating N/A'} ·{' '}
+                        {`Rating ${Number(product.rating ?? 0)}/5`} ·{' '}
                         {product.isBio ? 'Bio verified' : 'Conventional'} ·{' '}
                         {product.available ? 'Available' : 'Unavailable'} ·{' '}
                         {product.instantBuy ? 'Instant buy' : 'Inquiry only'}

@@ -2,6 +2,7 @@ const express = require('express');
 
 const { supabase, TABLES } = require('../lib/supabase');
 const { mapProductToApi } = require('../lib/domain');
+const { recalculateAndPersistProductRatings } = require('../lib/productRating');
 const {
   ADMIN_COOKIE_NAME,
   ADMIN_PASSWORD,
@@ -58,7 +59,9 @@ const PRODUCT_COLUMNS = [
   'category',
   'type',
   'Unit',
+  'quantity',
   'Price',
+  'rating',
   '"photo url"',
   '"bio check"',
   'available',
@@ -373,6 +376,17 @@ router.delete('/farmer-requests/:requestId/farm', requireAdmin, async (req, res,
       return res.status(500).json({ error: deleteRequestError.message || 'Unable to delete approved request.' });
     }
 
+    if (Array.isArray(deletedProducts) && deletedProducts.length > 0) {
+      try {
+        await recalculateAndPersistProductRatings({ supabase, tables: TABLES });
+      } catch (ratingError) {
+        console.error(
+          '[ratings] Unable to recalculate product ratings after farm delete:',
+          ratingError,
+        );
+      }
+    }
+
     return res.json({
       deleted: {
         requestId,
@@ -405,6 +419,15 @@ router.delete('/products/:productId', requireAdmin, async (req, res, next) => {
     const deletedProduct = Array.isArray(deletedRows) ? deletedRows[0] : null;
     if (!deletedProduct) {
       return res.status(404).json({ error: 'Product not found.' });
+    }
+
+    try {
+      await recalculateAndPersistProductRatings({ supabase, tables: TABLES });
+    } catch (ratingError) {
+      console.error(
+        '[ratings] Unable to recalculate product ratings after admin product delete:',
+        ratingError,
+      );
     }
 
     return res.json({

@@ -2,6 +2,10 @@ const express = require('express');
 
 const { requireAuth } = require('../middleware/auth');
 const { supabase, TABLES } = require('../lib/supabase');
+const {
+  RATING_ORDER_STATES,
+  recalculateAndPersistProductRatings,
+} = require('../lib/productRating');
 
 const router = express.Router();
 
@@ -659,6 +663,19 @@ router.patch('/:orderId/state', requireAuth, async (req, res, next) => {
       .eq('id', orderId);
     if (updateError) {
       return res.status(500).json({ error: updateError.message || 'Unable to update order.' });
+    }
+
+    const includedBefore = RATING_ORDER_STATES.includes(order.orderState);
+    const includedAfter = RATING_ORDER_STATES.includes(nextState);
+    if (includedBefore !== includedAfter) {
+      try {
+        await recalculateAndPersistProductRatings({ supabase, tables: TABLES });
+      } catch (ratingError) {
+        console.error(
+          '[ratings] Unable to recalculate product ratings after order state change:',
+          ratingError,
+        );
+      }
     }
 
     const detailedOrder = await fetchDetailedOrder({

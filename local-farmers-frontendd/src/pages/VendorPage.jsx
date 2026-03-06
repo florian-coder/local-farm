@@ -28,9 +28,9 @@ const initialProduct = {
   category: 'fruits_and_vegetables',
   type: '',
   unit: 'kg',
+  quantity: 0,
   price: 0,
   available: true,
-  rating: 4.0,
   isBio: false,
   instantBuy: false,
   photo: null,
@@ -394,7 +394,7 @@ export default function VendorPage() {
 
       const payload = {
         ...productForm,
-        rating: Number(productForm.rating),
+        quantity: Number(productForm.quantity),
         imageUrl,
       };
       delete payload.photo;
@@ -748,6 +748,18 @@ export default function VendorPage() {
               />
             </label>
             <label className="field">
+              Quantity
+              <input
+                type="number"
+                name="quantity"
+                min="0"
+                step="0.01"
+                value={productForm.quantity}
+                onChange={handleProductChange}
+                required
+              />
+            </label>
+            <label className="field">
               Price
               <input
                 type="number"
@@ -800,19 +812,6 @@ export default function VendorPage() {
                 )}
               </div>
             </div>
-            <label className="field">
-              Rating (1-5)
-              <input
-                type="number"
-                name="rating"
-                min="1"
-                max="5"
-                step="0.1"
-                value={productForm.rating}
-                onChange={handleProductChange}
-                required
-              />
-            </label>
             <label className="field checkbox">
               <input
                 type="checkbox"

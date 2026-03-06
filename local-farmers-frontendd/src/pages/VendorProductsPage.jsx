@@ -190,7 +190,7 @@ export default function VendorProductsPage() {
                               : product.category}{' '}
                         · {product.unit} · ${product.price}{' '}
                         ·{' '}
-                        {product.rating ? `Rating ${product.rating}/5` : 'Rating N/A'}
+                        {`Rating ${Number(product.rating ?? 0)}/5`}
                         {product.isBio ? ' · Bio Verified' : ' · Conventional'}
                         {product.instantBuy ? ' · Instant buy' : ' · Inquiry only'}
                       </p>

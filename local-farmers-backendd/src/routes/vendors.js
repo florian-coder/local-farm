@@ -27,7 +27,9 @@ const PRODUCT_COLUMNS = [
   'category',
   'type',
   'Unit',
+  'quantity',
   'Price',
+  'rating',
   '"photo url"',
   '"bio check"',
   'available',
@@ -96,7 +98,18 @@ router.get('/', async (_req, res, next) => {
           farmPhotos: entry.farmPhotos,
         });
         const productCount = entry.products.length;
-        const vendorRating = productCount > 0 ? 4 : null;
+        const ratingValues = entry.products
+          .map((product) => Number(product.rating))
+          .filter((value) => Number.isFinite(value));
+        const vendorRating =
+          ratingValues.length > 0
+            ? Number(
+                (
+                  ratingValues.reduce((sum, value) => sum + value, 0) /
+                  ratingValues.length
+                ).toFixed(2),
+              )
+            : 0;
 
         return {
           ...vendor,

@@ -16,6 +16,17 @@ const initialState = {
   error: null,
 };
 
+const formatQuantity = (value) => {
+  const parsed = Number(value);
+  if (!Number.isFinite(parsed)) {
+    return 'N/A';
+  }
+  if (Number.isInteger(parsed)) {
+    return String(parsed);
+  }
+  return parsed.toFixed(2).replace(/\.?0+$/, '');
+};
+
 export default function MarketsPage() {
   const { category } = useParams();
   const navigate = useNavigate();
@@ -421,7 +432,7 @@ export default function MarketsPage() {
                                           )}
                                         </div>
                                         <div>
-                                          <strong>{product.name}</strong> {product.type && <span className="muted">({product.type})</span>} · {product.unit} · ${product.price}{' '}
+                                          <strong>{product.name}</strong> {product.type && <span className="muted">({product.type})</span>} · Qty: {formatQuantity(product.quantity)} {product.unit || 'unit'} · ${product.price}{' '}
                                           <span className="muted">
                                             (
                                             {product.vendor?.id ? (
@@ -437,9 +448,7 @@ export default function MarketsPage() {
                                             )
                                           </span>
                                           <div className="muted">
-                                            {product.rating
-                                              ? `Rating ${product.rating}/5`
-                                              : 'Rating N/A'}
+                                            {`Rating ${Number(product.rating ?? 0)}/5`}
                                           </div>
                                           {product.vendor?.id && (
                                             <div className="button-group">

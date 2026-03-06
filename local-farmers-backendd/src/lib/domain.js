@@ -109,11 +109,12 @@ const mapProductToApi = (product, vendor = null) => ({
   category: product.category || 'fruits_and_vegetables',
   type: product.type || '',
   unit: product.Unit || 'unit',
+  quantity: toNumberOrNull(product.quantity),
   price:
     typeof product.Price === 'number' && Number.isFinite(product.Price)
       ? product.Price
       : toNumberOrNull(product.Price) || 0,
-  rating: 4,
+  rating: toNumberOrNull(product.rating) ?? 0,
   available: toBooleanAvailability(product.available),
   isBio: toBooleanAvailability(product['bio check']),
   instantBuy: Boolean(product.instant_buy),
